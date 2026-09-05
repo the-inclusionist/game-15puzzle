@@ -4,21 +4,23 @@ import { playwright } from '@vitest/browser-playwright';
 
 // ============================ THE ENGINE IS A LINKED DEPENDENCY ============================
 // `file:../SP-the-inclusionist-tracer` makes npm symlink the engine into node_modules under the
-// DEPENDENCY KEY, not under the package's own `name`. Three settings make raw-`.ts` exports work
-// through that symlink, and each does a different job:
+// DEPENDENCY KEY, not under the package's own `name` — so the name in package.json is the one that
+// has to be right. It is `@the-inclusionist/engine` (ADR-0071); the chess consumer still asks for
+// `@pm-monte/inclusionist-engine` and works only by accident of that mechanism.
 //
-//  · `optimizeDeps.exclude` here — keeps esbuild's pre-bundler away from the linked package, so
-//    `@the-inclusionist/engine/core/contract.ts` reaches Vite's own TS transform instead of being
-//    pre-bundled as though it were published JavaScript.
-//  · `allowImportingTsExtensions` in tsconfig — the exports map's targets end in `.ts` and every
-//    import site writes `.ts` explicitly. Only legal alongside `noEmit`, which is why the build is
-//    Vite's job and never `tsc`'s.
-//  · `moduleResolution: "bundler"` — the only mode that reads the exports map (including the
-//    `./core/*` wildcard) AND tolerates extensioned specifiers.
+// ⚠️ AND THE ENGINE NOW SHIPS A BUILT PACKAGE, WHICH CHANGES WHAT THIS FILE HAS TO DO. Its `exports`
+// map used to point at raw `.ts`; since the package build (`tsc -p tsconfig.pkg.json`, run by its
+// own `prepare` hook) it points at `dist-pkg/*.js` with `.d.ts` beside each one. So the import
+// specifier a game writes is `@the-inclusionist/engine/core/contract.js` — the `.js` is part of the
+// subpath pattern, and `core/contract.ts` resolves to NOTHING with an error that names conditions
+// rather than the missing extension.
+//
+// What that leaves this config doing: `exclude` keeps esbuild's pre-bundler off the linked package,
+// so its emitted modules go through the normal transform pipeline rather than being pre-bundled
+// from a symlink whose contents are rebuilt by `npm install`. Stated rather than relied upon.
 //
 // ⚠️ THE EXCLUDE STRING MUST MATCH THE DEPENDENCY KEY EXACTLY. A stale name matches nothing and
-// emits no warning — Vite would simply stop excluding, silently. Chess carries exactly that defect
-// in the opposite direction (its package.json still says `@pm-monte/inclusionist-engine`).
+// emits no warning — Vite simply stops excluding, silently.
 export default defineConfig({
   root: 'app',
   build: { outDir: '../dist', emptyOutDir: true, target: 'es2022' },

@@ -66,14 +66,17 @@ headers. Anything architectural becomes an ADR **there**.
 
 ## CI
 
-`.github/workflows/ci.yml` invokes the organisation's reusable workflow rather than carrying a copy
-of it (ADR-0068 §4 — three hundred copies of a pipeline drift, and the ones that drift silently are
-the ones that stop gating).
+`.github/workflows/ci.yml` invokes the reusable workflow that lives in the **engine repository**
+(`the-inclusionist/the-inclusionist-engine/.github/workflows/game-ci.yml`) and copies nothing of it —
+ADR-0068 §4, and ADR-0067 §5 is why it lives there rather than in a `.github` repository nobody's
+record declares. It runs with `a11y: true`, which is not a default: the input exists so that skipping
+pillar 2 is a visible line rather than an absence.
 
-⚠️ **It cannot go green yet.** The engine is consumed as `file:../SP-the-inclusionist-tracer`, a
-sibling directory that does not exist on a runner, and `the-inclusionist/the-inclusionist-engine` is
-still an empty repository. The workflow checks out both, so the first green run arrives when the
-engine is mirrored to GitHub. Until then the gates run locally through `npm run validate`.
+⚠️ **It cannot go green yet.** The gate runs `npm ci`, and the engine here is
+`file:../SP-the-inclusionist-tracer` — a sibling directory no runner has. ADR-0072 settles where it
+comes from instead (public npmjs, because a volunteer without a token cannot install from GitHub
+Packages), so the first green run arrives when the engine is published and this dependency becomes a
+version rather than a path. Until then the same gates run locally through `npm run validate`.
 
 ## Credits and licences
 

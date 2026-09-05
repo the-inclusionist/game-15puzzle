@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# ADR-0068 §4: a game's workflow INVOKES the organisation's reusable one and copies nothing. Three
+# hundred copies of a pipeline drift, and the ones that drift silently are the ones that stop
+# gating — while the repository still shows a green tick.
+#
+# The reusable workflow lives in the ENGINE repository rather than in a `.github` repository,
+# because ADR-0067 §5 says a repository is created when a RECORD declares its address, and no record
+# declares one for a workflows repository.
+#
+# ⚠️ THIS CANNOT GO GREEN YET, AND SAYING SO HERE IS THE POINT. The gate runs `npm ci`, and this
+# game's engine dependency is `file:../SP-the-inclusionist-tracer` — a sibling directory that does
+# not exist on a runner. ADR-0072 settles where it comes from instead (public npmjs, because a
+# volunteer without a token cannot install from GitHub Packages), so the first green run arrives
+# when the engine is published and this repository's dependency becomes a version rather than a
+# path. Until then the same gates run locally through `npm run validate`.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    uses: the-inclusionist/the-inclusionist-engine/.github/workflows/game-ci.yml@main
+    with:
+      # ⚠️ Named rather than defaulted. The input exists so that skipping pillar 2 is a VISIBLE line
+      # in the caller instead of an absence, and this game's whole shape is an accessibility
+      # argument — a visible grid of real buttons — so it is the last game that should skip it.
+      a11y: true

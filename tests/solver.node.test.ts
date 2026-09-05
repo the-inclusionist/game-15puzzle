@@ -29,9 +29,11 @@ function play(start: Board, moves: readonly Move[]): Board {
 }
 
 describe('the permutation code', () => {
+  // Explicitly budgeted: 362,880 round-trips is a few seconds on a warm machine and more on a cold
+  // one, and a five-second default turns a slow runner into a red pipeline that says nothing true.
   it('round-trips every one of the 362,880 arrangements', () => {
     for (let i = 0; i < 362880; i++) expect(rank(unrank(i))).toBe(i);
-  });
+  }, 30_000);
 
   it('ranks the identity at zero', () => {
     expect(rank([0, 1, 2, 3, 4, 5, 6, 7, 8])).toBe(0);
