@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.vite/
+*.local
+.DS_Store
+coverage/
+test-results/
+.claude/launch.json
+.vitest-attachments/
+tests/__screenshots__/

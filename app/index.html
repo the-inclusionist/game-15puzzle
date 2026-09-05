@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n="app.title">Quebra-cabeca deslizante</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0;
+    background: #05070f;
+    color: #c9d1d9;
+    font: 14px/1.5 system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* The engine's ui/layout measures THIS element and sizes #game-region from it, locking the
+     scale to whole PHYSICAL pixels (ADR-0001). */
+  #stage-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ========================= NO `overflow: hidden` HERE, DELIBERATELY =========================
+     The engine's own stylesheet clips #game-region, which is safe when the only focusable thing
+     inside is the region itself. Here the board IS a grid of focusable buttons, and a focus ring
+     on a corner tile would be silently cut in half. We do not import that stylesheet and we do
+     not reproduce the rule. The grid keeps its ring inside the cell (outline-offset: -3px)
+     anyway, so this is belt and braces — but the belt is the one that would fail quietly.
+
+     tabindex is -1 on the region, not 0: it stops being a tab stop the moment it holds focusable
+     children, and a stop that announces nothing is one a keyboard user pays for and gets nothing
+     from. The chess consumer needs 0 because its canvas takes the keys and its grid is invisible. */
+  #game-region {
+    position: relative;
+  }
+
+  /* The canvas fills whatever ui/layout sized the region to. It is scenery: the buttons above it
+     are the hit targets, and it is aria-hidden from boot. */
+  #board-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    pointer-events: none;
+  }
+
+  /* ========================= THE BOARD, IN PERCENTAGES =========================
+     The region is always exactly 320k by 180k, so a percentage is exact at every k and needs no
+     measurement at all. The tray is 160x160 logical pixels at x=8..168, y=10..170 — inside the
+     304x170 safe area with room, for 3x3, 4x4 and 5x5 alike.
+       left  =   8/320 = 2.5%      width  = 160/320 = 50%
+       top   =  10/180 = 5.5556%   height = 160/180 = 88.889%
+     Rows and cells get their own two numbers from render/geometry, which is the SAME module the
+     canvas draws from. One geometry, two surfaces — that is what keeps the number on the tile. */
+  .board {
+    position: absolute;
+    left: 2.5%;
+    top: 5.5556%;
+    width: 50%;
+    height: 88.889%;
+    pointer-events: none;   /* a click on a gutter falls through; nothing there should catch it */
+  }
+  .board [role="row"] { position: absolute; left: 0; width: 100%; }
+  .board [role="gridcell"] {
+    position: absolute; top: 0; height: 100%;
+    pointer-events: auto;
+    margin: 0; padding: 0; border: 0; background: transparent;
+    font: inherit;
+    /* NOT --ui-fs on its own: that is 16px at the k=2 floor, which overflows a 5x5 tile. --num-fs
+       is written by tile-grid from the same geometry the canvas uses, so the digit scales with the
+       TILE while still riding the engine's scale rather than a second one of our own. */
+    font-size: calc(var(--ui-fs, 16px) * var(--num-fs, 1.5));
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--tile-ink, #10151d);
+    display: grid; place-items: center;
+    cursor: pointer;
+    /* Kills the ~300ms double-tap delay and stops double-tap-to-zoom during quick tile taps. */
+    touch-action: manipulation;
+    -webkit-user-select: none; user-select: none;
+  }
+  .board [role="gridcell"]:focus-visible {
+    outline: 2px solid var(--accent, #FFD97D);
+    outline-offset: -3px;
+  }
+  .board [role="gridcell"][data-tile="0"] { cursor: default; color: transparent; }
+  .board [role="gridcell"][data-hint="1"] { outline: 2px dashed var(--accent, #FFD97D); outline-offset: -3px; }
+  .tile-num { will-change: transform; pointer-events: none; }
+
+  /* ========================= THE HUD =========================
+     x = 176..320 of 320 logical pixels: left 55%, width 45%. Roomier than the chess consumer's
+     27.5% because --ui-fs is 8k here and 16k there — 144 logical pixels at an 8px base is about
+     eighteen characters a line. */
+  .hud {
+    position: absolute;
+    left: 55%; top: 0; width: 45%; height: 100%;
+    box-sizing: border-box;
+    display: flex; flex-direction: column;
+    gap: calc(var(--ui-fs, 16px) * 0.35);
+    padding: calc(var(--ui-fs, 16px) * 0.3);
+    font-size: var(--ui-fs, 16px);
+    line-height: 1.25;
+    color: #c9d1d9;
+    background: #111a24;
+    border-left: 1px solid #2b3a4a;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .hud h2 {
+    margin: 0; font-size: 0.7em; font-weight: 600;
+    color: #8b949e; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .hud p { margin: 0; font-size: 0.8em; }
+  .hud-count { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.1em; }
+  .hud label { display: block; font-size: 0.72em; color: #8b949e; }
+  /* --tap is 22k, which is 44px at the k=2 floor: the WCAG 2.5.5 target size, inherited rather
+     than restated. The font shrinks; the TARGET does not. */
+  .hud button, .hud select {
+    width: 100%; min-height: var(--tap, 44px);
+    font: inherit; font-size: 0.78em;
+    color: #c9d1d9; background: #1b2733;
+    border: 1px solid #2b3a4a; border-radius: 2px;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  .hud button:hover { background: #24344a; }
+  .hud-check { display: flex; align-items: center; gap: 0.4em; font-size: 0.75em; min-height: var(--tap, 44px); }
+  .hud input[type="checkbox"] {
+    width: calc(var(--tap, 44px) * 0.4); height: calc(var(--tap, 44px) * 0.4);
+    flex: 0 0 auto; accent-color: #FFD97D;
+  }
+  .hud-spacer { flex: 1 1 auto; min-height: 0; }
+  /* AGPL section 13: the offer is a link a player can actually follow, not a line in a file they
+     will never open. See docs/LICENSES.md — it is why this project is AGPL and not GPL. */
+  .hud-legal { font-size: 0.62em; color: #6e7681; line-height: 1.35; }
+  .hud-legal a { color: #8b949e; }
+  .hud-legal a:focus-visible { outline: 2px solid #FFD97D; outline-offset: 2px; }
+
+  /* High contrast switches the panel with the board: same surface, same eye. */
+  #game-region[data-contrast="high"] .hud {
+    background: #000; color: #fff; border-left-color: #fff;
+  }
+  #game-region[data-contrast="high"] .hud h2,
+  #game-region[data-contrast="high"] .hud label,
+  #game-region[data-contrast="high"] .hud-legal { color: #fff; }
+  #game-region[data-contrast="high"] .hud button,
+  #game-region[data-contrast="high"] .hud select {
+    color: #fff; background: #000; border-color: #fff;
+  }
+  #game-region[data-contrast="high"] .hud-legal a { color: #fff; }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+
+  p.hint { color: #6e7681; margin: 0; padding: 10px; text-align: center; font-size: 12px; flex: 0 0 auto; }
+</style>
+</head>
+<body>
+
+<!-- MARKUP REQUIRED by createGame: #game-region, #sr-status, #sr-alert. Anything missing does not
+     throw — it lands in engine.problems, which boot/main.ts asserts is empty. -->
+<div id="stage-wrap">
+  <div id="game-region" tabindex="-1"></div>
+</div>
+
+<p class="hint" data-i18n="app.keys">Setas navegam &middot; Enter desliza a peca &middot; K sonar</p>
+
+<div id="sr-status" class="sr-only" role="status" aria-live="polite"></div>
+<div id="sr-alert"  class="sr-only" role="alert"  aria-live="assertive"></div>
+
+<!-- Empty host where installCvdFilters builds the six colour-vision filters at runtime. -->
+<svg id="cvd" class="sr-only" aria-hidden="true"></svg>
+
+<script type="module" src="./js/boot/main.ts"></script>
+</body>
+</html>

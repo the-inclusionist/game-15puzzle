@@ -1,0 +1,35 @@
+{
+  "name": "@the-inclusionist/game-15-puzzle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A sliding 15-puzzle (3x3 / 4x4 / 5x5) drawn procedurally with PixiJS at 320x180, with the tile numbers as a single DOM grid that serves sighted players and screen readers alike, on the Inclusionist accessibility engine.",
+  "license": "AGPL-3.0-or-later",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:node": "vitest run --project node",
+    "test:browser": "vitest run --project browser",
+    "test:a11y": "node scripts/axe-check.mjs",
+    "validate": "npm run typecheck && vitest run && vite build"
+  },
+  "dependencies": {
+    "@the-inclusionist/engine": "file:../SP-the-inclusionist-tracer",
+    "pixi.js": "7.4.2"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@types/node": "^22.0.0",
+    "@vitest/browser": "^4.0.0",
+    "@vitest/browser-playwright": "^4.0.0",
+    "playwright": "^1.49.0",
+    "typescript": "^5.7.0",
+    "vite": "^8.0.0",
+    "vitest": "^4.0.0"
+  }
+}
