@@ -5,7 +5,13 @@
   "type": "module",
   "description": "A sliding 15-puzzle (3x3 / 4x4 / 5x5) drawn procedurally with PixiJS at 320x180, with the tile numbers as a single DOM grid that serves sighted players and screen readers alike, on the Inclusionist accessibility engine.",
   "license": "AGPL-3.0-or-later",
-  "engines": { "node": ">=24" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/the-inclusionist/pixi-15-puzzle.git"
+  },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
