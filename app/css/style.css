@@ -225,6 +225,10 @@
      instead of being frozen at a pixel count. Press Start 2P is monospaced at 1em, so the mark is
      about 10 characters wide whatever that resolves to. */
   .title-mark { font-size: calc(var(--ui-fs, 16px) * 1.5); line-height: 1.4; letter-spacing: 0.02em; }
+  /* Smaller than the mark and above the fold of the action. Press Start 2P is monospaced at 1em,
+     so this line is exactly its character count wide — which is what keeps a twenty-character
+     credit inside a 320-logical-pixel screen at the k=2 floor. */
+  .title-credit { font-size: calc(var(--ui-fs, 16px) * 0.5); color: var(--title-ink, #e8e3d3); opacity: 0.85; }
   .title-start { font-size: calc(var(--ui-fs, 16px) * 0.75); color: var(--accent, #FFD97D); }
 
   /* A slow fade, not a blink: 1.6s is well under the three-per-second of WCAG 2.3.1.
@@ -245,6 +249,7 @@
   .screen--title[data-motion="reduced"] .title-start { animation: none; }
 
   #game-region[data-contrast="high"] .title-press { background: #000; color: #fff; }
+  #game-region[data-contrast="high"] .title-credit { color: #fff; opacity: 1; }
   #game-region[data-contrast="high"] .title-start { color: #00e5ff; }
 
   .sr-only {

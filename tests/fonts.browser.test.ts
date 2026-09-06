@@ -33,7 +33,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // asserting against a path the game does not use. Loading the BYTES and naming the face here tests
 // the one thing that matters and cannot drift: what is inside the woff2.
 import fontUrl from '../app/public/fonts/press-start-2p-400.woff2?url';
-import { TITLE_MARK } from '../app/js/ui/title-screen.ts';
+import { AUTHOR, TITLE_MARK } from '../app/js/ui/title-screen.ts';
 import { catalogs } from '../app/js/i18n/index.ts';
 
 const FAMILY = 'Press Start 2P';
@@ -42,6 +42,13 @@ const SIZE = 48;
 /** Every character the title screen can put on screen, in every language it speaks. */
 const CHARACTERS = [...new Set([
   ...TITLE_MARK,
+  // ⚠️ THE AUTHOR'S NAME IS IN HERE FOR ONE CHARACTER: the `é` of "José", U+00E9. A subset without
+  // it falls back for that letter ALONE — one Latin-1 accent in the middle of a pixel-art line, in
+  // a different typeface, with nothing reported anywhere. It is the same failure the sibling game
+  // shipped, narrowed to a single glyph, which would make it even harder to see.
+  ...AUTHOR,
+  ...catalogs.pt.strings['title.by'].replace('{name}', ''),
+  ...catalogs.en.strings['title.by'].replace('{name}', ''),
   ...catalogs.pt.strings['title.start'],
   ...catalogs.en.strings['title.start'],
   ...catalogs.es.strings['title.start'],

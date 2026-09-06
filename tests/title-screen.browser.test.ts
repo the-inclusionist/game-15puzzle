@@ -4,7 +4,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import '../app/css/style.css';
-import { TITLE_MARK, createTitleScreen } from '../app/js/ui/title-screen.ts';
+import { AUTHOR, TITLE_MARK, createTitleScreen } from '../app/js/ui/title-screen.ts';
 import { createTileGrid } from '../app/js/ui/tile-grid.ts';
 import { createI18n } from '../app/js/i18n/index.ts';
 import { createRun } from '../app/js/puzzle/run.ts';
@@ -56,11 +56,14 @@ describe('"click anywhere" is a button', () => {
     expect(box.height).toBeCloseTo(region.height, 0);
   });
 
-  it('is named by the game and by what pressing does', () => {
+  it('is named by the game, its author, and what pressing does — in that order', () => {
     const m = mount();
     const name = m.button().getAttribute('aria-label') ?? '';
     expect(name).toContain(TITLE_MARK);
+    expect(name).toContain(AUTHOR);
     expect(name).toContain(i18n.t('title.start'));
+    // The ACTION last: it is what a listener is waiting for, and where they stop listening.
+    expect(name.indexOf(AUTHOR)).toBeLessThan(name.indexOf(i18n.t('title.start')));
   });
 
   it('shows the same words it announces, so there is no second version to drift', () => {
@@ -149,6 +152,48 @@ describe('the typeface stops at this screen', () => {
     const cell = grid.root.querySelector<HTMLElement>('[role="gridcell"]')!;
     expect(getComputedStyle(cell).fontFamily).not.toContain('Press Start 2P');
     grid.destroy();
+  });
+});
+
+describe('the credit', () => {
+  it('shows the author under the mark', () => {
+    const m = mount();
+    const credit = m.screen.root.querySelector('.title-credit');
+    expect(credit?.textContent).toContain(AUTHOR);
+    // Under the mark and above the action, in DOM order, which is also reading order.
+    const spans = [...m.button().children].map((c) => c.className);
+    expect(spans).toEqual(['title-mark', 'title-credit', 'title-start']);
+  });
+
+  // ⚠️ IT IS NOT A COPYRIGHT NOTICE. Lei 9.609 art. 4º puts the patrimonial right with the
+  // Município — `agpl-source-offer` pins that no source file claims a holder — while Lei 9.610
+  // art. 24, II gives the author an inalienable right to be NAMED. Both hold at once, and this is
+  // the check that stops the credit drifting into the other thing.
+  it('names the author without claiming copyright', () => {
+    const m = mount();
+    const text = m.screen.root.textContent ?? '';
+    expect(text).not.toMatch(/copyright|©|todos os direitos|all rights/i);
+  });
+
+  it('reaches a screen reader as well as an eye — it is inside the named control', () => {
+    const m = mount();
+    expect(m.button().contains(m.screen.root.querySelector('.title-credit'))).toBe(true);
+  });
+
+  it('translates the frame and leaves the name alone', () => {
+    const m = mount();
+    const credit = m.screen.root.querySelector('.title-credit')?.textContent ?? '';
+    expect(credit).toContain(AUTHOR);
+    expect(credit).not.toContain('{name}');
+  });
+
+  it('fits inside the screen at the k=2 floor, where the region is narrowest', () => {
+    const m = mount();
+    m.screen.show();
+    const credit = m.screen.root.querySelector<HTMLElement>('.title-credit')!;
+    const region = m.region.getBoundingClientRect();
+    expect(credit.getBoundingClientRect().width).toBeLessThanOrEqual(region.width);
+    expect(credit.scrollWidth).toBeLessThanOrEqual(Math.ceil(credit.clientWidth) + 1);
   });
 });
 

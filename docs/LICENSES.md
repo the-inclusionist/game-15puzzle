@@ -20,6 +20,20 @@ requerimento — and not a decision of whoever wrote the code.
 This mirrors the engine's own `docs/LICENSES.md`. Nothing here changes that arrangement; this
 repository is a consumer of the engine and inherits its position.
 
+### Authorship is a different right, and the title screen states it
+
+⚠️ **A credit is not a copyright notice, and the two laws are not the same law.** Lei nº 9.609/1998
+art. 4º moves the **patrimonial** right to the employer — that is the sentence above, and it is why
+`LICENSE` names no holder and why `agpl-source-offer.node.test.ts` pins the absence of one in every
+source file. Lei nº 9.610/1998 art. 24, II is a different right entirely: the **moral** right of the
+author to have their name shown on the work, which is inalienable and irrenunciable, and therefore
+not the employer's to take or to grant.
+
+So the title screen reads **"por prof. José Rocha"**, and nothing about that reopens the ownership
+question. The Município owns the software; the authorship is stated. Recorded here because a reader
+who finds the credit and the missing copyright line in the same repository would otherwise be right
+to think one of them is a mistake.
+
 ⚠️ **And this is where the claim is stated, not in the package name.** The scope
 `@the-inclusionist` names the CONTAINER (ADR-0071). A scope carrying the Prefeitura's name,
 published by a public servant *before the ato*, would be a public claim on someone else's name.

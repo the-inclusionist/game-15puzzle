@@ -39,6 +39,18 @@ import type { I18n } from '../i18n/index.ts';
  */
 export const TITLE_MARK = '15-Puzzle!';
 
+/**
+ * The author's name. Not translated, and not a copyright line.
+ *
+ * ⚠️ IT DOES NOT CONTRADICT THE MISSING COPYRIGHT NOTICE, and the distinction is the whole reason
+ * this comment exists: Lei nº 9.609/1998 art. 4º moves the PATRIMONIAL right to the employer, which
+ * is why `LICENSE` names no holder and no source file carries one — `agpl-source-offer` pins that
+ * absence. Lei nº 9.610/1998 art. 24, II is a different right: the MORAL right to be named as the
+ * author, which is inalienable and is not the employer's to take. The Município owns the software;
+ * the authorship is stated here. Both are true at once and docs/LICENSES.md says so.
+ */
+export const AUTHOR = 'prof. José Rocha';
+
 export interface TitleScreenDeps {
   readonly doc: Document;
   readonly i18n: I18n;
@@ -74,20 +86,31 @@ export function createTitleScreen(deps: TitleScreenDeps): TitleScreen {
   mark.className = 'title-mark';
   mark.textContent = TITLE_MARK;
 
+  const credit = doc.createElement('span');
+  credit.className = 'title-credit';
+
   const start = doc.createElement('span');
   start.className = 'title-start';
 
-  button.append(mark, start);
+  // ⚠️ INSIDE the button, and that is deliberate on two counts. A credit outside it would be a hole
+  // in "click anywhere"; a credit a screen reader never reaches would be a credit only sighted
+  // people get. So it goes in, and into the accessible name — with the ACTION last, because that is
+  // what a listener is waiting for and the point at which they stop listening.
+  button.append(mark, credit, start);
   root.appendChild(button);
 
   const onClick = (): void => { deps.onStart(); };
   button.addEventListener('click', onClick);
 
   function refresh(): void {
+    // The frame translates and the name crosses as a parameter — the house rule for content that is
+    // not prose. "by"/"por" is the frame; "prof. José Rocha" is not translated, because a name is
+    // the same name in every language.
+    credit.textContent = i18n.t('title.by', { name: AUTHOR });
     start.textContent = i18n.t('title.start');
-    // The name a reader hears: the game, then what pressing does. The visible text says the same
-    // thing, so there is no second version of it to drift.
-    button.setAttribute('aria-label', `${TITLE_MARK} ${i18n.t('title.start')}`);
+    // The name a reader hears: the game, who made it, then what pressing does. The visible text
+    // says the same three things in the same order, so there is no second version of it to drift.
+    button.setAttribute('aria-label', `${TITLE_MARK}. ${credit.textContent}. ${i18n.t('title.start')}`);
     // An attribute and not a media query: a media query reaches the system preference and cannot
     // see the game's own switch, and the two have to agree.
     root.dataset.motion = deps.reducedMotion() ? 'reduced' : 'full';

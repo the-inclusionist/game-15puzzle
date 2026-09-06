@@ -14,6 +14,7 @@ const en: Catalog = {
     'app.title': 'Sliding puzzle',
     'app.keys': 'Arrows move · Enter slides the tile · K sonar · D hint',
     'title.start': 'Start',
+    'title.by': 'by {name}',
 
     'cell.at': 'row {row}, column {col}',
     'cell.home': 'in place',

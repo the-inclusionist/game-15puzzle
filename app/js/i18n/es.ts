@@ -14,6 +14,7 @@ const es: Catalog = {
     'app.title': 'Rompecabezas deslizante',
     'app.keys': 'Flechas navegan · Enter desliza la ficha · K sonar · D pista',
     'title.start': 'Comenzar',
+    'title.by': 'por {name}',
 
     'cell.at': 'fila {row}, columna {col}',
     'cell.home': 'en su lugar',
