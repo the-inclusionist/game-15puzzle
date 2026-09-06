@@ -42,6 +42,28 @@ try {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(URL, { waitUntil: 'networkidle' });
   await page.waitForSelector('#sr-status', { timeout: 10_000 });
+
+  // ⚠️ THE TITLE SCREEN IS SCANNED FIRST, AND IT IS THE ONE SURFACE THAT WOULD OTHERWISE BE MISSED.
+  // It is the first thing anyone sees, it is a single full-screen control, and it is the only place
+  // the pixel typeface appears — so its text contrast is a different measurement from the board's.
+  // Scanning only what comes after the click would test everything except the front door.
+  await page.waitForSelector('.screen--title button', { timeout: 10_000 });
+  {
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+      .analyze();
+    if (results.violations.length) {
+      failures += results.violations.length;
+      console.error(`
+✗ title screen`);
+      console.error(JSON.stringify(results.violations, null, 2));
+    } else {
+      console.log('✓ title screen: 0 WCAG A/AA violations');
+    }
+  }
+
+  // Into the game. Everything below needs the board and the panel, which live behind this click.
+  await page.click('.screen--title button');
   await page.waitForSelector('[role="gridcell"]', { timeout: 10_000 });
 
   for (const size of SIZES) {
@@ -76,4 +98,4 @@ if (failures) {
   console.error(`\n✗ axe: ${failures} WCAG A/AA violation(s).`);
   process.exit(1);
 }
-console.log('\n✓ axe: 0 WCAG A/AA violations across every board size and both palettes.');
+console.log('\n✓ axe: 0 WCAG A/AA violations: the title screen, and every board size in both palettes.');

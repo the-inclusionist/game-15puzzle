@@ -158,3 +158,31 @@ describe('ADR-0037 — no configurable address for a room', () => {
     }
   });
 });
+
+describe('SIL OFL — the notice travels with the font', () => {
+  const fonts = join(root, 'app', 'public', 'fonts');
+
+  // ⚠️ `public/` AND NOT `css/`, AND IT IS A LICENCE DECISION RATHER THAN A LAYOUT ONE. OFL 1.1
+  // requires the notice to be distributed WITH the font. A `.txt` sitting beside a BUNDLED `.woff2`
+  // is referenced by nothing, so the bundler copies the font into `assets/` under a content hash and
+  // leaves the licence behind — a built artifact carrying the typeface and not its terms. Vite
+  // copies `public/` verbatim, so the two arrive together, same names, same directory.
+  it('keeps the font and its licence in the directory that ships verbatim', () => {
+    expect(readFileSync(join(fonts, 'press-start-2p-400.woff2')).byteLength).toBeGreaterThan(1000);
+    const notice = readFileSync(join(fonts, 'press-start-2p.OFL.txt'), 'utf8');
+    expect(notice).toContain('SIL OPEN FONT LICENSE');
+    expect(notice).toContain('Reserved Font Name');
+    expect(notice).toContain('Copyright 2012 The Press Start 2P Project Authors');
+  });
+
+  it('is referenced by the stylesheet at the path that directory is served from', () => {
+    const css = readFileSync(join(root, 'app', 'css', 'style.css'), 'utf8');
+    expect(css).toContain("url('/fonts/press-start-2p-400.woff2')");
+  });
+
+  it('is named in docs/LICENSES.md, because a third-party licence in a file nobody lists is a gap', () => {
+    const doc = readFileSync(join(root, 'docs', 'LICENSES.md'), 'utf8');
+    expect(doc).toContain('Press Start 2P');
+    expect(doc).toContain('OFL');
+  });
+});

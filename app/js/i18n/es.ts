@@ -13,6 +13,7 @@ const es: Catalog = {
   strings: {
     'app.title': 'Rompecabezas deslizante',
     'app.keys': 'Flechas navegan · Enter desliza la ficha · K sonar · D pista',
+    'title.start': 'Comenzar',
 
     'cell.at': 'fila {row}, columna {col}',
     'cell.home': 'en su lugar',

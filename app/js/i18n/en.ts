@@ -13,6 +13,7 @@ const en: Catalog = {
   strings: {
     'app.title': 'Sliding puzzle',
     'app.keys': 'Arrows move · Enter slides the tile · K sonar · D hint',
+    'title.start': 'Start',
 
     'cell.at': 'row {row}, column {col}',
     'cell.home': 'in place',

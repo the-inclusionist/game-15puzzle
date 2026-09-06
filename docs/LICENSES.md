@@ -47,6 +47,24 @@ address* — an environment variable, a settings field, a build flag, an endpoin
 A static source link is none of those, and nothing in this game fetches anything off-origin; the
 verification protocol greps the built `dist/` to prove it.
 
+## The typeface on the title screen
+
+Press Start 2P is a pixel face, which is the opposite of what the engine's typography roster
+(ADR-0012) exists for: that roster is there so a child can choose a face she reads well and resize
+it. So the pixel face is scoped to the **title screen only** — a name, seen once, which is a logo —
+and never reaches the board's digits, where it would override the face she chose for herself.
+`title-screen.browser.test.ts` pins that scope.
+
+It is **self-hosted, never fetched from a font CDN**. Two reasons, and either would be enough:
+pillar 8 is offline-first, and a school browser asking Google for a font is a request leaving the
+device on behalf of a child, in a project whose whole compliance position is that nothing about her
+does.
+
+⚠️ It lives in `app/public/fonts/` rather than beside the stylesheet, and that is a licence decision.
+OFL 1.1 requires the notice to be distributed **with** the font; a `.txt` beside a bundled `.woff2`
+is referenced by nothing, so the bundler would copy the font into `assets/` under a content hash and
+leave the licence behind. `public/` is copied verbatim, so the two arrive together.
+
 ## The art
 
 There are no image assets. Every pixel this game draws is procedural: rectangles and lines issued
@@ -65,6 +83,7 @@ statement and does **not** inherit the AGPL.
 | `@the-inclusionist/engine` | AGPL-3.0-or-later | Same owner. Linked with `file:` during development; the second external consumer after `game-chess`. |
 | PixiJS 7.4.2 | MIT | Pinned to the engine's **exact** version — a second PixiJS in one page is a bug, not a fallback. |
 | Vite, Vitest, Playwright, TypeScript | MIT / Apache-2.0 | Development only; none ships. |
+| **Press Start 2P** by CodeMan38 | **SIL OFL 1.1** | The title screen's typeface, and only the title screen's — see below. Vendored at `app/public/fonts/`, with `press-start-2p.OFL.txt` beside it. |
 
 ### The upstream this game remakes
 

@@ -44,6 +44,7 @@ import { createBoardView } from '../render/board-view.ts';
 import { createSurface } from '../render/surface.ts';
 import { createTileGrid } from '../ui/tile-grid.ts';
 import { createHud, visionFilter } from '../ui/hud.ts';
+import { createTitleScreen } from '../ui/title-screen.ts';
 
 /**
  * ⚠️ NOT `store.kJogo()`. That helper hard-codes `JOGO_ID = 'inclusionist'`, so every consumer that
@@ -138,6 +139,43 @@ function boot(): void {
   });
   region.appendChild(hud.root);
 
+  /* ===================== THE TWO SCREENS =====================
+   *
+   * `createGame` hands over a scene stack, empty and ready, and this is what it is for. Two screens
+   * is little enough that a boolean would run — and a boolean is exactly how the third consumer ends
+   * up with a third spelling of the same idea. The engine declares the mechanism; a consumer that
+   * hand-rolls past it is not simpler, it is divergent.
+   *
+   * What the stack decides here is narrow and honest: WHICH screen is up. The title screen's own
+   * input is native (it is a button), and the board's is the grid's, so nothing is routed through
+   * `Scene.input` that the platform already routes better.
+   */
+  const titleScreen = createTitleScreen({
+    doc,
+    i18n,
+    reducedMotion: () => reducedMotion,
+    onStart: () => start(),
+  });
+  region.appendChild(titleScreen.root);
+
+  const cenaJogo = { nome: 'playing' };
+  const cenaTitulo = {
+    nome: 'title',
+    enter: () => { titleScreen.show(); grid.setInert(true); },
+    exit: () => { titleScreen.hide(); grid.setInert(false); },
+  };
+
+  function start(): void {
+    if (engine.cenas.top()?.nome !== 'title') return;
+    engine.cenas.replace(cenaJogo);
+    grid.focusCursor();
+    // The board has just arrived and she cannot see it. One sentence, and it is the same one the
+    // grid carries as its own label — said once here because nothing else announces an arrival.
+    srSay(`${i18n.t('a11y.boardLabel', { size: run.size })}. ${i18n.t('a11y.gridHint')}`);
+  }
+
+  function playing(): boolean { return engine.cenas.top()?.nome === 'playing'; }
+
   function applyLook(): void {
     const palette = highContrast ? HIGH : NORMAL;
     view.setPalette(palette);
@@ -147,6 +185,8 @@ function boot(): void {
     // is how the measured contrast ratios in render/palette stop describing what is on screen.
     region!.style.setProperty('--tile-ink', palette.ink);
     region!.style.setProperty('--accent', palette.accent);
+    region!.style.setProperty('--title-bg', palette.backdrop);
+    region!.style.setProperty('--title-ink', palette.tileAway);
     // ONE filter, on the region, reaching the canvas AND the numbers over it. See ui/hud.
     region!.style.filter = visionFilter(vision);
   }
@@ -166,6 +206,7 @@ function boot(): void {
   }
 
   function activate(index: number): void {
+    if (!playing()) return;                // the title screen is up; the board is scenery behind it
     if (slide.active()) return;            // one move at a time; the guard chess needed too
     const result = run.activate(index);
     if (result.kind === 'blocked') { srSay(i18n.t('a11y.blocked')); return; }
@@ -210,18 +251,21 @@ function boot(): void {
 
   // The language can change under a running game; anything JavaScript BUILT has to rebuild. The
   // engine re-applies only the static markup, and says so.
-  i18n.onChange(() => { grid.rebuild(); hud.relabel(); });
+  i18n.onChange(() => { grid.rebuild(); hud.relabel(); titleScreen.refresh(); });
 
   initLayout({ numJogadores: () => 1 });
   layout();
   window.addEventListener('resize', layout);
   applyLook();
 
+  engine.cenas.push(cenaTitulo);
+
   let dialogWasOpen = false;
   startLoop(surface.ticker, (dt) => {
-    // Held out of the tab order while an engine dialog is open. Polled rather than subscribed
-    // because the engine offers no event for it, and it is one property read per frame.
-    const open = engine.nav.sharedDialogOpen() !== null;
+    // Held out of the tab order while an engine dialog is open — or while the title screen is up,
+    // which is the same requirement for the same reason: a grid of twenty-five buttons behind
+    // something is still Tab-reachable, and the engine installs no focus trap anywhere.
+    const open = engine.nav.sharedDialogOpen() !== null || !playing();
     if (open !== dialogWasOpen) { dialogWasOpen = open; grid.setInert(open); }
 
     slide.advance(dt);
@@ -261,6 +305,8 @@ function boot(): void {
       },
       activate,
       hint: showHint,
+      start,
+      scene: () => engine.cenas.top()?.nome ?? null,
     };
   }
 }

@@ -177,6 +177,76 @@
   }
   #game-region[data-contrast="high"] .hud-legal a { color: #fff; }
 
+  /* ========================= THE TITLE SCREEN =========================
+     ⚠️ THE TYPEFACE IS SCOPED TO THIS SCREEN AND NOWHERE ELSE. Press Start 2P is a pixel face —
+     fixed, decorative, and the opposite of what the engine's typography roster exists for. On a
+     NAME seen once it is the right instrument, because it is a logo. On the board's digits it would
+     override the face a child chose for herself, which is the one thing typography settings are
+     for. `title-screen.browser` pins the scope. */
+  /* ⚠️ SERVED FROM `public/`, NOT BUNDLED, AND THAT IS A LICENCE DECISION. SIL OFL 1.1 requires the
+     notice to be distributed WITH the font. A `.txt` beside a bundled `.woff2` is referenced by
+     nothing, so the bundler would copy the font into `dist/assets/` with a content hash and leave
+     the licence behind — a built artifact carrying the font and not its terms. `public/` is copied
+     verbatim, so the two arrive together, with the same names, in the same directory.
+     `fonts.browser` fetches the notice to prove it. */
+  @font-face {
+    font-family: 'Press Start 2P';
+    src: url('/fonts/press-start-2p-400.woff2') format('woff2');
+    font-weight: 400;
+    font-display: swap;
+  }
+
+  .screen {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+  }
+
+  /* The whole screen IS the button: "click anywhere" without giving up a role, a name, a keyboard
+     path or a focus ring. See the header of ui/title-screen. */
+  .title-press {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: calc(var(--ui-fs, 16px) * 1.4);
+    margin: 0; padding: 0; border: 0;
+    background: var(--title-bg, #10141c);
+    color: var(--title-ink, #e8e3d3);
+    font-family: 'Press Start 2P', monospace;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-user-select: none; user-select: none;
+  }
+  .title-press:focus-visible { outline: 3px solid var(--accent, #FFD97D); outline-offset: -6px; }
+
+  /* Sized from --ui-fs, so it grows with the engine's scale and with the reader's own text size
+     instead of being frozen at a pixel count. Press Start 2P is monospaced at 1em, so the mark is
+     about 10 characters wide whatever that resolves to. */
+  .title-mark { font-size: calc(var(--ui-fs, 16px) * 1.5); line-height: 1.4; letter-spacing: 0.02em; }
+  .title-start { font-size: calc(var(--ui-fs, 16px) * 0.75); color: var(--accent, #FFD97D); }
+
+  /* A slow fade, not a blink: 1.6s is well under the three-per-second of WCAG 2.3.1.
+     ⚠️ THE FLOOR IS 0.6 AND IT IS A CONTRAST NUMBER, NOT A TASTE ONE. It was 0.35, which looks
+     right and is not: composited against the backdrop that leaves the word at 2.75:1, under even
+     the 3:1 that large text is allowed. The axe gate found it by sampling mid-animation — a review
+     by eye never would, because an eye watches the bright instant. At 0.6 the dimmest point of the
+     breath is 5.5:1 in the normal palette and 5.0:1 in high contrast, so the word clears 4.5:1 at
+     EVERY moment of the cycle rather than at its best one. `palette.node` recomputes both. */
+  @keyframes title-breathe { 0%, 100% { opacity: 1 } 50% { opacity: 0.6 } }
+  .screen--title[data-motion="full"] .title-start {
+    animation: title-breathe 1.6s ease-in-out infinite;
+  }
+  /* ⚠️ AN ATTRIBUTE, NOT A MEDIA QUERY. `prefers-reduced-motion` reaches the system preference and
+     cannot see the game's own switch; the composition root reads BOTH and writes the answer here,
+     so the two can never disagree. WCAG 2.2.2 — and the second mechanism is that pressing anything
+     ends the screen, since the screen is the button. */
+  .screen--title[data-motion="reduced"] .title-start { animation: none; }
+
+  #game-region[data-contrast="high"] .title-press { background: #000; color: #fff; }
+  #game-region[data-contrast="high"] .title-start { color: #00e5ff; }
+
   .sr-only {
     position: absolute; width: 1px; height: 1px;
     overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;

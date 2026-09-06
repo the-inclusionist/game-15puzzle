@@ -7,7 +7,9 @@ import { describe, expect, it } from 'vitest';
 import {
   BOARD, GAP, LAYOUT, LOGICAL_H, LOGICAL_W, SAFE, SIZES, boardGeometry,
 } from '../app/js/render/geometry.ts';
-import { HIGH, NORMAL, contrast } from '../app/js/render/palette.ts';
+import { HIGH, NORMAL, TITLE_PULSE_FLOOR, composite, contrast } from '../app/js/render/palette.ts';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createSlide } from '../app/js/render/slide.ts';
 import { createBoardView } from '../app/js/render/board-view.ts';
 import { legalMoves, solved } from '../app/js/puzzle/board.ts';
@@ -135,6 +137,30 @@ describe('palette — the ratios are measured', () => {
       });
     });
   }
+
+  // ⚠️ THE TITLE PULSE, AT ITS WEAKEST MOMENT. Found by axe, not by looking: a fading word is
+  // legible at opacity 1 and can be illegible at the bottom of the breath, and an eye watching an
+  // animation only ever registers the bright instant. 4.5:1 rather than the 3:1 large text is
+  // allowed, because the size depends on --ui-fs and this should not have to be re-derived when it
+  // moves.
+  it('keeps the pulsing word above 4.5:1 at the DIMMEST point of the cycle', () => {
+    for (const p of [NORMAL, HIGH]) {
+      const dim = composite(p.accent, TITLE_PULSE_FLOOR, p.backdrop);
+      expect(contrast(dim, p.backdrop), `${p.name} at ${TITLE_PULSE_FLOOR}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('and the stylesheet uses the same floor this was computed from', () => {
+    const css = readFileSync(join(import.meta.dirname, '..', 'app', 'css', 'style.css'), 'utf8');
+    expect(css).toContain(`opacity: ${TITLE_PULSE_FLOOR}`);
+  });
+
+  it('composites the way a browser does — in sRGB, not in linear light', () => {
+    // Half of white over black is #808080, not the mid-luminance grey linear mixing would give.
+    expect(composite('#ffffff', 0.5, '#000000')).toBe('#808080');
+    expect(composite('#ffd97d', 1, '#10141c')).toBe('#ffd97d');
+    expect(composite('#ffd97d', 0, '#10141c')).toBe('#10141c');
+  });
 
   it('is a real step up in high contrast, not a rename', () => {
     expect(contrast(HIGH.ink, HIGH.tileAway)).toBeGreaterThan(contrast(NORMAL.ink, NORMAL.tileAway));

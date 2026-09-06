@@ -18,6 +18,7 @@ const pt: Catalog = {
   strings: {
     'app.title': 'Quebra-cabeça deslizante',
     'app.keys': 'Setas navegam · Enter desliza a peça · K sonar · D dica',
+    'title.start': 'Iniciar',
 
     // ---- what a cell says when the reader lands on it -------------------------------------
     // Position first, because it is what orients someone who cannot see the board; then what is

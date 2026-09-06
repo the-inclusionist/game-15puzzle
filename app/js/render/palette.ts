@@ -103,3 +103,32 @@ export function contrast(a: string, b: string): number {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 }
+
+/**
+ * The colour an element of `colour` at `alpha` actually shows against `behind`.
+ *
+ * ⚠️ A FADED ELEMENT IS NOT THE COLOUR IT DECLARES, and that is a whole class of contrast bug that
+ * review-by-eye cannot see: the eye watches the bright instant of a pulse and axe samples the dim
+ * one. Browsers composite in sRGB rather than in linear light, so this mixes the 0..255 channels
+ * directly — which is what makes the result match what the accessibility checker measures.
+ */
+export function composite(colour: string, alpha: number, behind: string): string {
+  const channels = (hex: string): number[] => {
+    const n = hex.replace('#', '');
+    return [0, 1, 2].map((i) => parseInt(n.slice(i * 2, i * 2 + 2), 16));
+  };
+  const [fr, fg, fb] = channels(colour);
+  const [br, bg, bb] = channels(behind);
+  const mix = (f: number, b: number): string =>
+    Math.round(f * alpha + b * (1 - alpha)).toString(16).padStart(2, '0');
+  return `#${mix(fr, br)}${mix(fg, bg)}${mix(fb, bb)}`;
+}
+
+/**
+ * The dimmest point of the title screen's pulse, as a fraction.
+ *
+ * ⚠️ WRITTEN TWICE ON PURPOSE — here and in `@keyframes title-breathe`. CSS cannot import this, so
+ * the test asserts the stylesheet still says the same number. Two copies that are checked against
+ * each other beat one copy nobody can reach from the place that has to reason about it.
+ */
+export const TITLE_PULSE_FLOOR = 0.6;
