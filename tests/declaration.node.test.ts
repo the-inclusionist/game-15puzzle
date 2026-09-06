@@ -185,12 +185,26 @@ describe('objectiveOf', () => {
 });
 
 describe('targetsOf', () => {
-  it('hands the sonar the tiles that can move, and only those', () => {
+  // ⚠️ THE PUSH WIDENED THIS, and the number is exact rather than a range: a click slides a whole
+  // line, so every cell in the blank's row and column can move — `2(size - 1)` of them, always.
+  // Six on a 4x4, eight on a 5x5. It was two to four before.
+  it('hands the sonar the whole row and column of the blank', () => {
+    for (const n of [3, 4, 5]) {
+      const h = harness(n);
+      const targets = h.declaration.targetsOf(0);
+      expect(targets.length, `size ${n}`).toBe(2 * (n - 1));
+      for (const t of targets) expect(h.declaration.roleAt(t), `size ${n}`).toMatch(/^(key|structure)$/);
+    }
+  });
+
+  it('never offers a cell that is neither in the row nor in the column', () => {
     const h = harness(4);
-    const targets = h.declaration.targetsOf(0);
-    expect(targets.length).toBeGreaterThanOrEqual(2);
-    expect(targets.length).toBeLessThanOrEqual(4);
-    for (const t of targets) expect(h.declaration.roleAt(t)).toMatch(/^(key|structure)$/);
+    const blank = h.run().board().indexOf(0);
+    const bx = blank % 4; const by = Math.floor(blank / 4);
+    for (const t of h.declaration.targetsOf(0)) {
+      expect(t.x === bx || t.y === by, `${t.x},${t.y} against blank ${bx},${by}`).toBe(true);
+      expect(t.x === bx && t.y === by).toBe(false);
+    }
   });
 
   it('is empty when solved — empty is an answer, not a fault', () => {

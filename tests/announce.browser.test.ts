@@ -80,8 +80,8 @@ describe('what a move says', () => {
     if (result.kind !== 'moved') return;
 
     srSay(i18n.t('a11y.moved', {
-      tile: i18n.describeTile(result.move.tile).text,
-      dir: i18n.direction(result.move.direction),
+      tile: i18n.describeTile(result.push[0].tile).text,
+      dir: i18n.direction(result.push[0].direction),
       have: run.tilesHome(),
       need: 15,
     }));
@@ -93,6 +93,44 @@ describe('what a move says', () => {
     expect(said).toContain('de 15');                    // the progress, in the same breath
     // ⚠️ ONE sentence. Splitting the count off would queue a second utterance per move.
     expect(said.split('.').filter((s) => s.trim()).length).toBeLessThanOrEqual(2);
+  });
+
+  // ⚠️ ONE UTTERANCE FOR A PRESS THAT MOVED THREE TILES. `#sr-status` is `aria-live="polite"`, which
+  // QUEUES rather than interrupts — so three sentences for one press would put a listener a press
+  // behind the board and keep her there for the rest of the game.
+  it('says a three-tile press as ONE sentence, with the count', async () => {
+    const run = createRun({ size: 4, seed: 1, solver, board: solved(4) });
+    const result = run.activate(12);
+    expect(result.kind).toBe('moved');
+    if (result.kind !== 'moved') return;
+    expect(result.push).toHaveLength(3);
+
+    srSay(i18n.t('a11y.movedMany', {
+      count: result.push.length,
+      dir: i18n.direction(result.push[0].direction),
+      have: run.tilesHome(),
+      need: 15,
+    }));
+    await frame();
+
+    const said = status.textContent ?? '';
+    expect(said).toContain('3');
+    expect(said).toContain('para a direita');
+    expect(said).toContain('de 15');
+    // One clause about the move, one about the progress. Never one per tile.
+    expect(said.split('.').filter((s) => s.trim()).length).toBeLessThanOrEqual(2);
+  });
+
+  it('names how many rather than naming each tile', async () => {
+    const run = createRun({ size: 4, seed: 1, solver, board: solved(4) });
+    const result = run.activate(12);
+    if (result.kind !== 'moved') return;
+    srSay(i18n.describePush(result.push));
+    await frame();
+    const said = status.textContent ?? '';
+    expect(said).toContain('3');
+    // The individual tile numbers would be three facts where the player needs one.
+    for (const move of result.push) expect(said).not.toContain(`peça ${move.tile}`);
   });
 
   it('explains a refusal instead of falling silent', async () => {
@@ -120,14 +158,18 @@ describe('what the hint says', () => {
     // refusal, and the assertion below counts them.
     for (let i = 0; i < 3; i++) run.activate(legalMoves(run.board())[0].from);
     const before = run.board();
-    const moves = run.hint(3);
-    expect(moves.length).toBeGreaterThan(0);
+    const presses = run.hint(3);
+    expect(presses.length).toBeGreaterThan(0);
 
-    srSay(i18n.t('a11y.hint', { moves: moves.map((m) => i18n.describeMove(m)).join(', ') }));
+    srSay(i18n.t('a11y.hint', { moves: presses.map((p) => i18n.describePush(p)).join(', ') }));
     await frame();
 
     const said = status.textContent ?? '';
-    for (const move of moves) expect(said).toContain(String(move.tile));
+    // A press of one names its tile; a press of several names how many. Either way it is ONE clause.
+    for (const press of presses) {
+      if (press.length === 1) expect(said).toContain(String(press[0].tile));
+      else expect(said).toContain(String(press.length));
+    }
     // ⚠️ IT SHOWS AND DOES NOT PLAY. Requerimento 49.e is the line between delivering the answer
     // instead of the reasoning and revealing it alongside the attempt.
     expect(run.board()).toEqual(before);

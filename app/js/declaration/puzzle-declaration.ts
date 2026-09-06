@@ -15,8 +15,9 @@
 //              becomes a beacon on the only square where anything can happen.
 //   structure  a tile already home. Scenery that blocks you, exactly as a wall does — and the
 //              solving method literally treats closed rows as walls it must not disturb.
-//   key        a tile out of place that CAN slide right now. It satisfies the `gate`, and the gate
-//              is the blank.
+//   key        a tile out of place that CAN slide right now — which, since a click pushes a whole
+//              line, is every tile in the blank's row and column. It satisfies the `gate`, and the
+//              gate is the blank.
 //   gate       a tile out of place that cannot slide yet. "Barred until a condition", and the
 //              condition is the blank arriving. This is real information: a sighted player reads it
 //              off proximity in a glance, and without this field a blind player cannot get it at all.
@@ -39,7 +40,7 @@
 import type {
   Focus, GameDeclaration, Heading, Objective, Role, Speakable, Spot,
 } from '@the-inclusionist/engine/core/contract.js';
-import { homeOf, legalMoves, moveOf } from '../puzzle/board.ts';
+import { homeOf, pushOf, pushableFrom } from '../puzzle/board.ts';
 import { inBounds, indexOf, spotOf } from '../puzzle/types.ts';
 import type { Direction } from '../puzzle/types.ts';
 import type { Run } from '../puzzle/run.ts';
@@ -79,7 +80,7 @@ export function createPuzzleDeclaration(deps: DeclarationDeps): GameDeclaration 
       const tile = board[i];
       if (tile === 0) return 'goal';
       if (homeOf(tile) === i) return 'structure';
-      return moveOf(board, i) ? 'key' : 'gate';
+      return pushOf(board, i).length > 0 ? 'key' : 'gate';
     },
 
     nameAt(at: Spot): Speakable | null {
@@ -94,10 +95,11 @@ export function createPuzzleDeclaration(deps: DeclarationDeps): GameDeclaration 
       if (playerIndex !== 0) return null;
       const run = deps.run();
       const i = run.cursor();
-      const move = moveOf(run.board(), i);
-      // `heading` is the direction the tile under the cursor WOULD travel, which is exactly what
-      // the cane wants to know about the thing it is touching. 'none' when it cannot travel.
-      return { id: 'cursor', at: spotOf(i, run.size), heading: move ? HEADING[move.direction] : 'none' };
+      // `heading` is the direction the tile under the cursor WOULD travel, which is exactly what the
+      // cane wants to know about the thing it is touching. Every tile in a push travels the same
+      // way, so the first move answers for all of them. 'none' when it cannot travel.
+      const direction = pushOf(run.board(), i)[0]?.direction;
+      return { id: 'cursor', at: spotOf(i, run.size), heading: direction ? HEADING[direction] : 'none' };
     },
 
     objectiveOf(playerIndex: number): Objective {
@@ -110,18 +112,23 @@ export function createPuzzleDeclaration(deps: DeclarationDeps): GameDeclaration 
     },
 
     /**
-     * The tiles that can slide right now — not the blank.
+     * The tiles that can slide right now — the blank's whole row and column, minus the blank.
      *
-     * The sonar picks the NEAREST target and names it, so handing it the movable tiles makes it
-     * name the one the player would actually press. Handing it the blank instead would give one
-     * beacon and no choice, which is a poorer sentence for the same work.
+     * The sonar picks the NEAREST target and names it, so handing it the movable tiles makes it name
+     * one the player could actually press. Handing it the blank instead would give one beacon and no
+     * choice, which is a poorer sentence for the same work.
+     *
+     * ⚠️ THE PUSH WIDENED THIS, and that is the accessibility half of the rules change. It was the
+     * two-to-four tiles beside the blank; it is now up to `2(size - 1)` — eight on a 5x5. A sighted
+     * player reads that off the board in a glance; without this field a blind player could not get
+     * it at all.
      *
      * Empty when solved, and empty is an answer rather than a fault — the contract says so.
      */
     targetsOf(playerIndex: number): readonly Spot[] {
       const run = deps.run();
       if (playerIndex !== 0 || run.solved()) return [];
-      return legalMoves(run.board()).map((m) => spotOf(m.from, run.size));
+      return pushableFrom(run.board()).map((i) => spotOf(i, run.size));
     },
   };
 }
@@ -147,9 +154,13 @@ export function describeCell(deps: DeclarationDeps, index: number): string {
 
   const name = deps.i18n.describeTile(tile).text;
   const settled = deps.i18n.t(homeOf(tile) === index ? 'cell.home' : 'cell.away');
-  const move = moveOf(board, index);
-  const affordance = move
-    ? `, ${deps.i18n.t('cell.movable', { dir: deps.i18n.direction(move.direction) })}`
-    : '';
+  // How many tiles this cell would move, and which way. One is the common case and reads best
+  // without a number; more than one has to say how many, because "can slide left" would be the same
+  // sentence for a press that moves one tile and a press that moves four.
+  const push = pushOf(board, index);
+  const affordance = push.length === 0 ? '' : `, ${deps.i18n.t(
+    push.length === 1 ? 'cell.movable' : 'cell.movableMany',
+    { dir: deps.i18n.direction(push[0].direction), count: push.length },
+  )}`;
   return `${where}, ${name}, ${settled}${affordance}`;
 }

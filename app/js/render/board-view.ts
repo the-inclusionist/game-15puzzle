@@ -26,7 +26,7 @@
 // rectangle drawn on a canvas cannot. One fewer thing to draw, and a better one.
 
 import type { Camada, CriarDesenho, DesenhoComLinha } from '@the-inclusionist/engine/render/port.js';
-import type { Board, Direction, Move } from '../puzzle/types.ts';
+import type { Board } from '../puzzle/types.ts';
 import { homeOf } from '../puzzle/board.ts';
 import type { BoardGeometry, Rect } from './geometry.ts';
 import { LOGICAL_H, LOGICAL_W } from './geometry.ts';
@@ -37,9 +37,16 @@ export interface BoardSnapshot {
   readonly board: Board;
   /** Indices whose tile can slide right now — the declaration's `key` role, made visible. */
   readonly movable: readonly number[];
-  /** The first move of the hint, or null. Shown as a static chevron; never blinking (WCAG 2.3.1). */
-  readonly hint: Move | null;
-  readonly travelling: Travelling | null;
+  /**
+   * The tiles the hint says to press — the whole push, one to `size - 1` of them.
+   *
+   * ⚠️ IT USED TO BE AN ARROW IN THE DESTINATION, AND THAT WAS THE WRONG PICTURE. An arrow says
+   * "something will arrive here"; what a player needs to know is WHICH TILES SHE IS ABOUT TO MOVE,
+   * and with a push that is up to four of them at once. So the hint lights the tiles themselves.
+   * Static, never blinking (WCAG 2.3.1).
+   */
+  readonly hint: readonly number[];
+  readonly travelling: readonly Travelling[];
 }
 
 export interface BoardView {
@@ -78,27 +85,6 @@ export function createBoardView(deps: BoardViewDeps): BoardView {
       .endFill();
   };
 
-  /**
-   * A chevron pointing the way the hinted tile will travel, drawn as stacked rows so its edges land
-   * on whole pixels. The engine's own icons are built this way (`game/props.ts`) for the same
-   * reason: an anti-aliased diagonal at this resolution reads as a smudge.
-   */
-  const chevron = (r: Rect, direction: Direction, colour: string): void => {
-    const rows = Math.max(3, Math.min(7, (r.h >> 2) | 1));
-    const cx = r.x + (r.w >> 1);
-    const cy = r.y + (r.h >> 1);
-    g.beginFill(hex(colour));
-    const half = rows >> 1;
-    for (let i = 0; i < rows; i++) {
-      const span = 1 + i * 2;
-      if (direction === 'up') g.drawRect(cx - i, cy - half + i, span, 1);
-      else if (direction === 'down') g.drawRect(cx - i, cy + half - i, span, 1);
-      else if (direction === 'left') g.drawRect(cx - half + i, cy - i, 1, span);
-      else g.drawRect(cx + half - i, cy - i, 1, span);
-    }
-    g.endFill();
-  };
-
   return {
     setGeometry(next) { geometry = next; },
     setPalette(next) { palette = next; },
@@ -121,24 +107,22 @@ export function createBoardView(deps: BoardViewDeps): BoardView {
       }
 
       const movable = new Set(s.movable);
+      const hinted = new Set(s.hint);
+      const flying = new Set(s.travelling.map((t) => t.at));
+
       for (let i = 0; i < s.board.length; i++) {
         const tile = s.board[i];
         if (tile === 0) continue;
-        // The travelling tile is drawn LAST, offset, so it passes over its neighbour rather than
-        // under it. Everything else is in place, because the model committed the move already.
-        if (s.travelling && s.travelling.at === i) continue;
+        // Anything in flight is drawn LAST, offset, so it passes over its neighbours rather than
+        // under them. Everything else is in place, because the model committed the push already.
+        if (flying.has(i)) continue;
         drawTile(geometry.cellRect(i), tile, i);
       }
 
-      if (s.travelling) {
-        const r = geometry.cellRect(s.travelling.at);
-        drawTile({ ...r, x: r.x + s.travelling.dx, y: r.y + s.travelling.dy }, s.travelling.tile, s.travelling.at);
+      for (const t of s.travelling) {
+        const r = geometry.cellRect(t.at);
+        drawTile({ ...r, x: r.x + t.dx, y: r.y + t.dy }, t.tile, t.at);
       }
-
-      // The hint's chevron sits in the DESTINATION — the empty square the tile is going to — because
-      // that is the thing the player has to look at, and because a marker on the tile would compete
-      // with the focus ring on the same cell.
-      if (s.hint) chevron(geometry.cellRect(s.hint.to), s.hint.direction, palette.accent);
 
       function drawTile(r: Rect, tile: number, index: number): void {
         const home = homeOf(tile) === index;
@@ -151,9 +135,20 @@ export function createBoardView(deps: BoardViewDeps): BoardView {
         if (home && r.w > 6) {
           bevel({ x: r.x + 2, y: r.y + 2, w: r.w - 4, h: r.h - 4 }, palette.tileLo, palette.tileHi);
         }
-        // A tile that can slide gets an outline. Same information as the declaration's `key` role,
-        // said to the eye instead of to the sonar.
-        if (movable.has(index)) {
+        // ⚠️ THE HINT LIGHTS THE TILES, and it is drawn thicker than the movable outline rather
+        // than merely a different colour. Two states on the same square — "this can move" and "move
+        // THIS" — separated only by hue would be a WCAG 1.4.1 failure and unreadable under every
+        // colour-vision filter the engine ships. Weight is the second carrier.
+        if (hinted.has(index) && r.w > 8) {
+          const inset = 2;
+          fill({ x: r.x + inset, y: r.y + inset, w: r.w - inset * 2, h: 2 }, palette.accent);
+          fill({ x: r.x + inset, y: r.y + r.h - inset - 2, w: r.w - inset * 2, h: 2 }, palette.accent);
+          fill({ x: r.x + inset, y: r.y + inset, w: 2, h: r.h - inset * 2 }, palette.accent);
+          fill({ x: r.x + r.w - inset - 2, y: r.y + inset, w: 2, h: r.h - inset * 2 }, palette.accent);
+        }
+        // A tile that can slide gets a thin outline. Same information as the declaration's `key`
+        // role, said to the eye instead of to the sonar.
+        if (movable.has(index) && !hinted.has(index)) {
           g.lineStyle(1, hex(palette.accent), 1);
           g.moveTo(r.x + 0.5, r.y + 0.5).lineTo(r.x + r.w - 0.5, r.y + 0.5)
             .lineTo(r.x + r.w - 0.5, r.y + r.h - 0.5).lineTo(r.x + 0.5, r.y + r.h - 0.5)

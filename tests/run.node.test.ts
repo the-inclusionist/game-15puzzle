@@ -51,7 +51,7 @@ describe('activate — the three answers', () => {
     const before = r.board();
     const result = r.activate(r.board().indexOf(0) - 1);   // the tile left of the blank
     expect(result.kind).toBe('moved');
-    if (result.kind === 'moved') expect(r.board()).toEqual(apply(before, result.move));
+    if (result.kind === 'moved') expect(r.board()).toEqual(apply(before, result.push[0]));
   });
 });
 
@@ -100,9 +100,10 @@ describe('the objective', () => {
   it('reaches solved by playing the hints it gives', () => {
     const r = run4();
     for (let guard = 0; guard < 500 && !r.solved(); guard++) {
-      const [next] = r.hint(1);
-      expect(next, 'a hint on an unsolved board').toBeDefined();
-      expect(r.activate(next.from).kind).toBe('moved');
+      const [press] = r.hint(1);
+      expect(press, 'a hint on an unsolved board').toBeDefined();
+      // Press the far end of the push, which is the click the hint is describing.
+      expect(r.activate(press[press.length - 1].from).kind).toBe('moved');
     }
     expect(r.solved()).toBe(true);
   });
@@ -118,8 +119,8 @@ describe('the hint is not gated', () => {
   it('is still available after twenty moves, and after being used', () => {
     const r = run4();
     for (let i = 0; i < 20; i++) {
-      const [next] = r.hint(1);
-      r.activate(next.from);
+      const [press] = r.hint(1);
+      r.activate(press[press.length - 1].from);
     }
     expect(r.hint().length).toBeGreaterThan(0);
   });
@@ -161,5 +162,81 @@ describe('a new run', () => {
     a.activate(a.board().indexOf(0) - 1);
     expect(b.moves()).toBe(0);
     expect(b.board()).toEqual(shuffle(4, createRng(7)).board);
+  });
+});
+
+describe('a press is the unit of record', () => {
+  // ⚠️ THE DECISION, IN ONE PAIR OF TESTS. The counter is a record of what the PLAYER DID (ADR-0049),
+  // and she did one thing — so a press that slides three tiles counts one. The same displacement made
+  // one press at a time counts three, because that is three things she did. Counting tiles instead
+  // would make the counter rise fastest for the most efficient move on the board, which is the
+  // opposite of a work log.
+  it('counts ONE for a press that slides three tiles', () => {
+    const r = createRun({ size: 4, seed: 1, solver, board: solved(4) });
+    const result = r.activate(12);                 // the far end of the blank's row
+    expect(result.kind).toBe('moved');
+    if (result.kind === 'moved') expect(result.push).toHaveLength(3);
+    expect(r.moves()).toBe(1);
+  });
+
+  it('counts THREE when she makes the same displacement one press at a time', () => {
+    const r = createRun({ size: 4, seed: 1, solver, board: solved(4) });
+    r.activate(14); r.activate(13); r.activate(12);
+    expect(r.moves()).toBe(3);
+    // And it is the same board either way — the record differs, the position does not.
+    const oneGo = createRun({ size: 4, seed: 1, solver, board: solved(4) });
+    oneGo.activate(12);
+    expect(r.board()).toEqual(oneGo.board());
+  });
+
+  it('reports the whole push, so the announcement can be one sentence', () => {
+    const r = createRun({ size: 4, seed: 1, solver, board: solved(4) });
+    const result = r.activate(3);                  // three tiles down the blank's column
+    if (result.kind !== 'moved') throw new Error('expected a move');
+    expect(result.push).toHaveLength(3);
+    for (const move of result.push) expect(move.direction).toBe('down');
+  });
+
+  it('refuses a tile in neither the row nor the column, and says so', () => {
+    const r = createRun({ size: 4, seed: 1, solver, board: solved(4) });
+    expect(r.activate(0)).toEqual({ kind: 'blocked', index: 0 });
+    expect(r.moves()).toBe(0);
+  });
+
+  it('leaves the cursor on the tile she pressed, which moved one cell', () => {
+    const r = createRun({ size: 4, seed: 1, solver, board: solved(4) });
+    r.activate(12);
+    // Every tile in a push moves ONE cell, so the tile from 12 is now at 13 — and the blank is at 12.
+    expect(r.cursor()).toBe(13);
+    expect(r.board()[12]).toBe(0);
+  });
+});
+
+describe('the hint speaks in presses', () => {
+  it('returns pushes, not single tiles', () => {
+    const r = run4();
+    for (const press of r.hint(3)) {
+      expect(press.length).toBeGreaterThanOrEqual(1);
+      // Every tile in one press travels the same way — that is what makes it one press.
+      for (const move of press) expect(move.direction).toBe(press[0].direction);
+    }
+  });
+
+  it('gives a press the player can actually make in one click', () => {
+    const r = run4();
+    const [press] = r.hint(1);
+    const clicked = press[press.length - 1].from;
+    const result = r.activate(clicked);
+    expect(result.kind).toBe('moved');
+    if (result.kind === 'moved') expect(result.push).toHaveLength(press.length);
+  });
+
+  it('compresses a straight run the solver reported as separate moves', () => {
+    // A board one straight push away from solved: the solver sees three moves, the player sees one
+    // click, and the hint has to agree with the player.
+    const r = createRun({ size: 4, seed: 1, solver, board: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 13, 14, 15] });
+    const presses = r.hint(3);
+    expect(presses).toHaveLength(1);
+    expect(presses[0]).toHaveLength(3);
   });
 });

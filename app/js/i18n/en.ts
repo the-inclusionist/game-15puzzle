@@ -18,6 +18,7 @@ const en: Catalog = {
     'cell.home': 'in place',
     'cell.away': 'out of place',
     'cell.movable': 'can slide {dir}',
+    'cell.movableMany': 'can slide {count} tiles {dir}',
     'cell.blank': 'empty space',
 
     'dir.up': 'up',
@@ -28,6 +29,7 @@ const en: Catalog = {
     'a11y.boardLabel': 'Sliding puzzle, {size} by {size}',
     'a11y.gridHint': 'Arrows move, Enter slides the tile',
     'a11y.moved': '{tile} {dir}. {have} of {need} in place',
+    'a11y.movedMany': '{count} tiles {dir}. {have} of {need} in place',
     'a11y.blocked': 'That tile cannot slide right now',
     'a11y.blankCell': 'Empty space. Nothing slides from here',
     'a11y.shuffled': 'Shuffled. {size} by {size}, {need} tiles',
@@ -35,6 +37,7 @@ const en: Catalog = {
     'a11y.hint': 'Next moves: {moves}',
     'a11y.hintNone': 'Already solved',
     'a11y.move': '{tile} {dir}',
+    'a11y.moveMany': '{count} tiles {dir}',
     'status.solved': 'Solved in {moves} moves',
     'status.crashed': 'The game stopped. Reload the page',
 

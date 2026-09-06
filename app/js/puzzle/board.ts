@@ -127,3 +127,97 @@ export function tilesHome(b: Board): number {
   for (let i = 0; i < b.length; i++) if (b[i] !== 0 && homeOf(b[i]) === i) n++;
   return n;
 }
+
+/* ===================== THE PUSH =====================
+ *
+ * Clicking a tile that is not beside the blank, but IS in the blank's row or column, slides every
+ * tile between them one step. It is what almost every modern sliding puzzle does and what the
+ * upstream this game remakes does NOT — that one only ever shifts the single adjacent tile.
+ *
+ * ⚠️ THE RULES CHANGE IS SMALL AND WHAT IT REACHES IS NOT. `roleAt` and `targetsOf` are written
+ * against "can this tile move right now", so widening that widens the DECLARATION: a 5x5 goes from
+ * four movable tiles to eight, the sonar starts pointing at all of them, and the cane starts saying
+ * "can slide" where it used to say "barred". The rule a sighted player reads off the board and the
+ * sentence a blind player hears are the same field, and this is the field.
+ *
+ * A push is returned as the ORDERED LIST of single-tile moves it is made of, nearest the blank
+ * first. Everything downstream — the animation, the announcement, the solver — keeps thinking in
+ * single tiles; only the player's ACTION got bigger.
+ */
+
+/**
+ * The moves a click on `index` would make: empty when the click does nothing, one move when the
+ * tile is beside the blank, up to `size - 1` moves when it is at the far end of the row or column.
+ */
+export function pushOf(b: Board, index: number): readonly Move[] {
+  const tile = b[index];
+  if (tile === undefined || tile === 0) return [];
+  const size = sizeOf(b);
+  const blank = blankAt(b);
+  const sameRow = Math.floor(index / size) === Math.floor(blank / size);
+  const sameCol = index % size === blank % size;
+  if (!sameRow && !sameCol) return [];
+
+  // One step along the line, pointing from the blank TOWARD the clicked tile. The tiles travel the
+  // other way — see the note on direction in `moveOf`.
+  const stride = sameRow ? 1 : size;
+  const step = index > blank ? stride : -stride;
+  const count = Math.abs(index - blank) / stride;
+
+  const out: Move[] = [];
+  for (let k = 1; k <= count; k++) {
+    const from = blank + k * step;
+    const to = from - step;
+    out.push({ tile: b[from], from, to, direction: directionOf(from, to, size)! });
+  }
+  return out;
+}
+
+/** Apply a whole push, in order. A fold over `apply`; the board is never mutated. */
+export function applyPush(b: Board, push: readonly Move[]): Board {
+  let next = b;
+  for (const move of push) next = apply(next, move);
+  return next;
+}
+
+/**
+ * Every cell a click could move — the blank's whole row and column, minus the blank itself.
+ *
+ * This is what `targetsOf` hands the sonar. It replaces `legalMoves` there and not everywhere:
+ * `legalMoves` is still what the SOLVER reasons in, because a solver that had to choose among
+ * pushes would be choosing among the same states by a longer route.
+ */
+export function pushableFrom(b: Board): readonly number[] {
+  const size = sizeOf(b);
+  const blank = blankAt(b);
+  const row = Math.floor(blank / size);
+  const col = blank % size;
+  const out: number[] = [];
+  for (let x = 0; x < size; x++) if (x !== col) out.push(row * size + x);
+  for (let y = 0; y < size; y++) if (y !== row) out.push(y * size + col);
+  return out;
+}
+
+/**
+ * Group a solver's single-tile moves into the PUSHES a player would actually press.
+ *
+ * The solver reasons one tile at a time and should keep doing so — a search over pushes would reach
+ * the same states by a longer route. But the hint has to speak the language of the INPUT: if the
+ * board takes pushes and the help talks about tiles, the two are describing the same screen in
+ * different units, and the player has to translate.
+ *
+ * ⚠️ THE TEST FOR "SAME PUSH" IS EXACT, NOT A HEURISTIC. In one push each move's destination is the
+ * previous move's origin — the blank walks a straight line, and every tile behind it steps up one.
+ * So two consecutive moves belong together precisely when `b.to === a.from` and they travel the same
+ * way. Nothing about distance or geometry needs checking; those two facts imply the rest.
+ */
+export function compressPushes(moves: readonly Move[]): readonly (readonly Move[])[] {
+  const out: Move[][] = [];
+  for (const move of moves) {
+    const current = out[out.length - 1];
+    const previous = current?.[current.length - 1];
+    if (previous && move.to === previous.from && move.direction === previous.direction) current.push(move);
+    else out.push([move]);
+  }
+  return out;
+}

@@ -26,13 +26,21 @@
 // answer INSTEAD of the reasoning, and that line is kept elsewhere: the hint REVEALS the next few
 // moves and never plays them.
 
-import { apply, isSolved, moveOf, solved, tilesHome } from './board.ts';
+import { applyPush, compressPushes, isSolved, pushOf, solved, tilesHome } from './board.ts';
 import type { Board, Move } from './types.ts';
 import type { Solver } from './solver.ts';
 
 /** What activating a cell did. Every branch is something the reader has to be able to announce. */
 export type Activation =
-  | { readonly kind: 'moved'; readonly move: Move }
+  /**
+   * One player ACTION, which may have slid up to `size - 1` tiles.
+   *
+   * ⚠️ It carries the whole push and not a single move, because everything downstream has to agree
+   * on how many things happened: the animation moves them together, and the announcement is ONE
+   * utterance. `srSay` is `aria-live="polite"` and QUEUES, so three sentences for one press would
+   * put a listener permanently behind the board and keep her there.
+   */
+  | { readonly kind: 'moved'; readonly push: readonly Move[] }
   /** A tile that exists but is not beside the blank. Not an error — the commonest tap on a board. */
   | { readonly kind: 'blocked'; readonly index: number }
   /** The empty square itself. Saying "nothing slides from here" beats saying nothing. */
@@ -51,8 +59,16 @@ export interface Run {
   solved(): boolean;
   /** Tiles standing on their own home square — the objective's `have`. */
   tilesHome(): number;
-  /** The next few moves on a solving path. Shown, never played. Empty when solved. */
-  hint(count?: number): readonly Move[];
+  /**
+   * The next few PRESSES on a solving path — each one a push of one to `size - 1` tiles. Shown,
+   * never played. Empty when solved.
+   *
+   * ⚠️ PUSHES AND NOT MOVES, because the hint has to speak the language of the input. The solver
+   * thinks one tile at a time and should keep doing so; if the board takes pushes and the help talks
+   * about single tiles, the player is the one who has to translate — and three of the solver's moves
+   * are often ONE press.
+   */
+  hint(count?: number): readonly (readonly Move[])[];
 }
 
 export interface RunOptions {
@@ -86,19 +102,23 @@ export function createRun(o: RunOptions): Run {
         return { kind: 'blocked', index };
       }
       if (board[index] === 0) return { kind: 'blank', index };
-      const move = moveOf(board, index);
-      if (move === null) return { kind: 'blocked', index };
-      board = apply(board, move);
+      const push = pushOf(board, index);
+      if (push.length === 0) return { kind: 'blocked', index };
+      board = applyPush(board, push);
+      // ⚠️ ONE, whatever the push moved. ADR-0049 makes the counter a record of what SHE DID, and
+      // she made one decision — so counting the tiles would quietly penalise the most efficient
+      // move on the board, which is the opposite of a work log.
       moves++;
-      // The cursor follows the tile. She just acted on it; her next Enter should still reach it,
-      // and a cursor that stayed behind would sit on the square she has just emptied.
-      cursor = move.to;
-      return { kind: 'moved', move };
+      // The cursor follows the tile she pressed. A push moves every tile ONE cell, so the tile she
+      // clicked lands one step nearer the blank and the blank ends up under where she clicked — a
+      // cursor left where it was would be sitting on the hole she just opened.
+      cursor = push[push.length - 1].to;
+      return { kind: 'moved', push };
     },
 
     solved: () => isSolved(board),
     tilesHome: () => tilesHome(board),
-    hint: (count = 3) => o.solver.hint(board, count),
+    hint: (count = 3) => (isSolved(board) ? [] : compressPushes(o.solver.solve(board)).slice(0, count)),
   };
 }
 

@@ -3,6 +3,12 @@
 Slide numbered tiles into the one empty square until they are in order. 3×3, 4×4 or 5×5, drawn
 procedurally at **320×180** and upscaled by a whole number of physical pixels.
 
+Pressing any tile in the empty square's row or column slides the whole line — one press, up to four
+tiles. The upstream this game remakes only ever shifts the single adjacent tile, so this is an
+improvement on the reference rather than parity with it. It counts as ONE move, because the counter
+records what the player did and she did one thing; the same displacement made one press at a time
+counts three.
+
 Everything below the game comes from `@the-inclusionist/engine` through a single `createGame()`
 call: screen reader, Libras, colour-vision filters, blind-navigation sonar, remappable input as
 intent, typography, dialog stack and menu navigation.

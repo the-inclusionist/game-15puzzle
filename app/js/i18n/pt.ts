@@ -26,6 +26,7 @@ const pt: Catalog = {
     'cell.home': 'no lugar',
     'cell.away': 'fora do lugar',
     'cell.movable': 'pode deslizar {dir}',
+    'cell.movableMany': 'pode deslizar {count} peças {dir}',
     'cell.blank': 'espaço vazio',
 
     'dir.up': 'para cima',
@@ -37,6 +38,7 @@ const pt: Catalog = {
     'a11y.boardLabel': 'Quebra-cabeça deslizante, {size} por {size}',
     'a11y.gridHint': 'Setas navegam, Enter desliza a peça',
     'a11y.moved': '{tile} {dir}. {have} de {need} no lugar',
+    'a11y.movedMany': '{count} peças {dir}. {have} de {need} no lugar',
     'a11y.blocked': 'Esta peça não pode deslizar agora',
     'a11y.blankCell': 'Espaço vazio. Nada desliza daqui',
     'a11y.shuffled': 'Embaralhado. {size} por {size}, {need} peças',
@@ -44,6 +46,7 @@ const pt: Catalog = {
     'a11y.hint': 'Próximas jogadas: {moves}',
     'a11y.hintNone': 'Já está resolvido',
     'a11y.move': '{tile} {dir}',
+    'a11y.moveMany': '{count} peças {dir}',
     'status.solved': 'Resolvido em {moves} jogadas',
     'status.crashed': 'O jogo parou. Recarregue a página',
 

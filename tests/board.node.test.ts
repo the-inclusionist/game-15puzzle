@@ -6,7 +6,8 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  apply, blankAt, homeOf, isSolved, legalMoves, moveOf, sizeOf, solved, tilesHome,
+  apply, applyPush, blankAt, compressPushes, homeOf, isSolved, legalMoves, moveOf, pushOf,
+  pushableFrom, sizeOf, solved, tilesHome,
 } from '../app/js/puzzle/board.ts';
 import { indexOf, inBounds, spotOf } from '../app/js/puzzle/types.ts';
 
@@ -159,5 +160,127 @@ describe('types', () => {
     expect(inBounds({ x: -1, y: 0 }, 4)).toBe(false);
     expect(inBounds({ x: 4, y: 0 }, 4)).toBe(false);
     expect(inBounds({ x: 0.5, y: 0 }, 4)).toBe(false);
+  });
+});
+
+describe('pushOf — one press, several tiles', () => {
+  // A solved 4x4 has the blank at index 15, which is row 3, column 3.
+  const board = solved(4);
+
+  it('slides one tile when the click is next to the blank', () => {
+    const push = pushOf(board, 14);
+    expect(push).toHaveLength(1);
+    expect(push[0]).toEqual({ tile: 15, from: 14, to: 15, direction: 'right' });
+  });
+
+  it('slides two, three and four, along a row', () => {
+    expect(pushOf(board, 13)).toHaveLength(2);
+    expect(pushOf(board, 12)).toHaveLength(3);
+    expect(pushOf(solved(5), 20)).toHaveLength(4);      // 5x5: blank at 24, click the far end
+  });
+
+  it('slides along a column just the same', () => {
+    const push = pushOf(board, 3);                      // same column as the blank, three rows up
+    expect(push).toHaveLength(3);
+    for (const move of push) expect(move.direction).toBe('down');
+  });
+
+  // ⚠️ THE CASE THAT SEPARATES A PUSH FROM A FREE-FOR-ALL. The opposite corner shares neither the
+  // row nor the column, so no single finger movement could produce it — and nothing should pretend
+  // otherwise by moving tiles round a bend.
+  it('does nothing for a tile in neither the row nor the column', () => {
+    expect(pushOf(board, 0)).toEqual([]);
+    expect(pushOf(board, 5)).toEqual([]);
+    expect(pushOf(solved(5), 0)).toEqual([]);
+  });
+
+  it('does nothing for the blank itself, or for a cell off the board', () => {
+    expect(pushOf(board, 15)).toEqual([]);
+    expect(pushOf(board, 99)).toEqual([]);
+  });
+
+  it('orders the moves from the blank outwards, each landing where the last one started', () => {
+    const push = pushOf(board, 12);
+    expect(push[0].to).toBe(15);                        // the first one fills the blank
+    for (let i = 1; i < push.length; i++) expect(push[i].to).toBe(push[i - 1].from);
+  });
+
+  it('leaves the blank exactly where the click was', () => {
+    for (const index of [14, 13, 12, 3, 7, 11]) {
+      const after = applyPush(board, pushOf(board, index));
+      expect(after.indexOf(0), `click ${index}`).toBe(index);
+    }
+  });
+
+  it('moves every tile exactly ONE cell, however long the push', () => {
+    const push = pushOf(board, 12);
+    const after = applyPush(board, push);
+    for (const move of push) {
+      expect(Math.abs(move.to - move.from)).toBe(1);
+      expect(after[move.to]).toBe(move.tile);
+    }
+  });
+
+  it('is the same thing as playing its moves one at a time', () => {
+    let byHand = board;
+    for (const move of pushOf(board, 12)) byHand = apply(byHand, move);
+    expect(applyPush(board, pushOf(board, 12))).toEqual(byHand);
+  });
+
+  it('is undone by pushing back from the other end', () => {
+    const after = applyPush(board, pushOf(board, 12));
+    expect(applyPush(after, pushOf(after, 15))).toEqual(board);
+  });
+});
+
+describe('pushableFrom — what a click could reach', () => {
+  it('is the row and the column, minus the blank', () => {
+    for (const n of [3, 4, 5]) {
+      const cells = pushableFrom(solved(n));
+      expect(cells, `size ${n}`).toHaveLength(2 * (n - 1));
+      expect(new Set(cells).size, `size ${n}`).toBe(cells.length);   // the blank is not counted twice
+    }
+  });
+
+  it('agrees with pushOf on every cell of the board', () => {
+    const b = solved(4);
+    const reachable = new Set(pushableFrom(b));
+    for (let i = 0; i < 16; i++) expect(pushOf(b, i).length > 0, `cell ${i}`).toBe(reachable.has(i));
+  });
+});
+
+describe('compressPushes — the solver speaks tiles, the player presses lines', () => {
+  it('leaves a lone move as a press of one', () => {
+    const moves = pushOf(solved(4), 14);
+    expect(compressPushes(moves)).toEqual([moves]);
+  });
+
+  it('gathers a straight run into a single press', () => {
+    const moves = pushOf(solved(4), 12);
+    const pressed = compressPushes(moves);
+    expect(pressed).toHaveLength(1);
+    expect(pressed[0]).toHaveLength(3);
+  });
+
+  it('breaks when the blank turns a corner', () => {
+    const b = solved(4);
+    const along = pushOf(b, 13);                        // two tiles rightwards
+    const after = applyPush(b, along);
+    const down = pushOf(after, 5);                      // then a different line
+    expect(compressPushes([...along, ...down])).toHaveLength(2);
+  });
+
+  it('breaks when the direction reverses, even along the same line', () => {
+    const b = solved(4);
+    const out = pushOf(b, 14);
+    const after = applyPush(b, out);
+    const back = pushOf(after, 15);
+    expect(compressPushes([...out, ...back])).toHaveLength(2);
+  });
+
+  it('loses no move and keeps the order', () => {
+    const moves = [...pushOf(solved(4), 12)];
+    expect(compressPushes(moves).flat()).toEqual(moves);
+    expect(compressPushes([])).toEqual([]);
   });
 });

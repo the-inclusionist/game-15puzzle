@@ -10,7 +10,7 @@ import {
 import { HIGH, NORMAL, contrast } from '../app/js/render/palette.ts';
 import { createSlide } from '../app/js/render/slide.ts';
 import { createBoardView } from '../app/js/render/board-view.ts';
-import { legalMoves, moveOf, solved } from '../app/js/puzzle/board.ts';
+import { legalMoves, solved } from '../app/js/puzzle/board.ts';
 import type { DesenhoComLinha } from '@the-inclusionist/engine/render/port.js';
 
 describe('geometry — the numbers, checked rather than trusted', () => {
@@ -146,29 +146,29 @@ describe('slide — one clock, whole pixels', () => {
 
   it('starts a slide fully offset and ends it at zero', () => {
     const s = createSlide({ frames: 8 });
-    s.begin(move, 4, 39);
-    expect(s.travelling()).toEqual({ tile: 5, at: 5, dx: 39, dy: 0 });
+    s.begin([move], 4, 39);
+    expect(s.travelling()).toEqual([{ tile: 5, at: 5, dx: 39, dy: 0 }]);
     while (s.advance(1)) { /* run it out */ }
-    expect(s.travelling()).toBeNull();
+    expect(s.travelling()).toEqual([]);
   });
 
   it('offsets by WHOLE logical pixels at every frame — the shared rounding', () => {
     const s = createSlide({ frames: 9 });
-    s.begin(move, 4, 39);
+    s.begin([move], 4, 39);
     do {
-      const t = s.travelling();
-      expect(t).not.toBeNull();
-      expect(Number.isInteger(t!.dx)).toBe(true);
-      expect(Number.isInteger(t!.dy)).toBe(true);
+      const [t] = s.travelling();
+      expect(t).toBeDefined();
+      expect(Number.isInteger(t.dx)).toBe(true);
+      expect(Number.isInteger(t.dy)).toBe(true);
     } while (s.advance(1));
   });
 
   it('closes the distance monotonically', () => {
     const s = createSlide({ frames: 9 });
-    s.begin(move, 4, 39);
+    s.begin([move], 4, 39);
     let last = Infinity;
     do {
-      const d = Math.abs(s.travelling()!.dx);
+      const d = Math.abs(s.travelling()[0].dx);
       expect(d).toBeLessThanOrEqual(last);
       last = d;
     } while (s.advance(1));
@@ -176,8 +176,8 @@ describe('slide — one clock, whole pixels', () => {
 
   it('carries a vertical move on the other axis', () => {
     const s = createSlide({ frames: 8 });
-    s.begin({ tile: 2, from: 1, to: 5, direction: 'down' }, 4, 39);
-    const t = s.travelling()!;
+    s.begin([{ tile: 2, from: 1, to: 5, direction: 'down' }], 4, 39);
+    const [t] = s.travelling();
     expect(t.dy).toBe(-39);
     expect(t.dx).toBe(0);
   });
@@ -188,28 +188,28 @@ describe('slide — one clock, whole pixels', () => {
   it('collapses to nothing when motion is reduced, and reads the switch each time', () => {
     let reduced = true;
     const s = createSlide({ frames: 8, reduced: () => reduced });
-    s.begin(move, 4, 39);
-    expect(s.travelling()).toEqual({ tile: 5, at: 5, dx: 0, dy: 0 });
+    s.begin([move], 4, 39);
+    expect(s.travelling()).toEqual([{ tile: 5, at: 5, dx: 0, dy: 0 }]);
     expect(s.advance(1)).toBe(false);
 
     reduced = false;
-    s.begin(move, 4, 39);
-    expect(s.travelling()!.dx).toBe(39);
+    s.begin([move], 4, 39);
+    expect(s.travelling()[0].dx).toBe(39);
   });
 
   it('takes dt in FRAMES, so a bigger step finishes sooner', () => {
     const fast = createSlide({ frames: 8 });
-    fast.begin(move, 4, 39);
+    fast.begin([move], 4, 39);
     expect(fast.advance(8)).toBe(false);      // one frame worth eight: done
-    expect(fast.travelling()).toBeNull();
+    expect(fast.travelling()).toEqual([]);
   });
 
   it('can be cancelled mid-flight — a reshuffle must not leave a tile in the air', () => {
     const s = createSlide({ frames: 8 });
-    s.begin(move, 4, 39);
+    s.begin([move], 4, 39);
     s.cancel();
     expect(s.active()).toBe(false);
-    expect(s.travelling()).toBeNull();
+    expect(s.travelling()).toEqual([]);
   });
 });
 
@@ -247,7 +247,7 @@ describe('board-view — and the recorder never sees a glyph', () => {
 
   it('clears once per redraw, so frames do not accumulate', () => {
     const { v, calls } = view();
-    const snapshot = { board: solved(4), movable: [], hint: null, travelling: null };
+    const snapshot = { board: solved(4), movable: [], hint: [], travelling: [] };
     v.draw(snapshot); v.draw(snapshot);
     expect(calls.filter((c) => c.op === 'clear')).toHaveLength(2);
   });
@@ -259,8 +259,8 @@ describe('board-view — and the recorder never sees a glyph', () => {
     v.draw({
       board: solved(4),
       movable: [11, 14],
-      hint: moveOf(solved(4), 14),
-      travelling: { tile: 15, at: 15, dx: 12, dy: 0 },
+      hint: [14],
+      travelling: [{ tile: 15, at: 15, dx: 12, dy: 0 }],
     });
     const ops = new Set(calls.map((c) => c.op));
     expect([...ops].sort()).toEqual(['beginFill', 'clear', 'drawRect', 'endFill', 'lineStyle', 'lineTo', 'moveTo']);
@@ -270,7 +270,7 @@ describe('board-view — and the recorder never sees a glyph', () => {
     for (const n of SIZES) {
       const { v, calls } = view(n);
       const g = boardGeometry(n);
-      v.draw({ board: solved(n), movable: [], hint: null, travelling: null });
+      v.draw({ board: solved(n), movable: [], hint: [], travelling: [] });
       const bodies = calls.filter(
         (c) => c.op === 'drawRect' && c.args[2] === g.cell && c.args[3] === g.cell,
       );
@@ -284,8 +284,8 @@ describe('board-view — and the recorder never sees a glyph', () => {
     const g = boardGeometry(4);
     const home = g.cellRect(15);
     v.draw({
-      board: solved(4), movable: [], hint: null,
-      travelling: { tile: 15, at: 15, dx: -13, dy: 0 },
+      board: solved(4), movable: [], hint: [],
+      travelling: [{ tile: 15, at: 15, dx: -13, dy: 0 }],
     });
     const bodies = calls.filter((c) => c.op === 'drawRect' && c.args[2] === g.cell && c.args[3] === g.cell);
     expect(bodies.some((c) => c.args[0] === home.x - 13 && c.args[1] === home.y)).toBe(true);
@@ -295,17 +295,17 @@ describe('board-view — and the recorder never sees a glyph', () => {
     const board = solved(4);
     const movable = legalMoves(board).map((m) => m.from);
     const { v, calls } = view();
-    v.draw({ board, movable, hint: null, travelling: null });
+    v.draw({ board, movable, hint: [], travelling: [] });
     expect(calls.filter((c) => c.op === 'lineStyle' && c.args[0] === 1)).toHaveLength(movable.length);
   });
 
-  it('draws the hint chevron only when there is a hint', () => {
+  it('lights the hinted tiles, and draws nothing extra when there is no hint', () => {
     const { v, calls } = view();
-    const plain = { board: solved(4), movable: [], hint: null, travelling: null };
+    const plain = { board: solved(4), movable: [], hint: [], travelling: [] };
     v.draw(plain);
     const without = calls.length;
     calls.length = 0;
-    v.draw({ ...plain, hint: moveOf(solved(4), 14) });
+    v.draw({ ...plain, hint: [14] });
     expect(calls.length).toBeGreaterThan(without);
   });
 
@@ -314,7 +314,7 @@ describe('board-view — and the recorder never sees a glyph', () => {
     v.setGeometry(boardGeometry(5));
     v.setPalette(HIGH);
     calls.length = 0;
-    v.draw({ board: solved(5), movable: [], hint: null, travelling: null });
+    v.draw({ board: solved(5), movable: [], hint: [], travelling: [] });
     const g = boardGeometry(5);
     expect(calls.some((c) => c.op === 'drawRect' && c.args[2] === g.cell)).toBe(true);
     expect(calls.some((c) => c.op === 'beginFill' && c.args[0] === 0xd99b00)).toBe(true);

@@ -44,7 +44,7 @@
 // keypress away. Worth saying, because "no undo" otherwise reads as an omission.
 
 import type { BoardGeometry } from '../render/geometry.ts';
-import type { Move } from '../puzzle/types.ts';
+
 import type { Travelling } from '../render/slide.ts';
 import type { Run } from '../puzzle/run.ts';
 import type { I18n } from '../i18n/index.ts';
@@ -79,10 +79,10 @@ export interface TileGrid {
   refresh(): void;
   /** Rebuild the whole grid — a new board size, or a language change. */
   rebuild(): void;
-  /** Move the travelling number. Called once per frame, from the same callback as the canvas. */
-  setOffset(t: Travelling | null): void;
-  /** Mark the tile the hint says to press. Null clears it. */
-  setHint(move: Move | null): void;
+  /** Move the travelling numbers. Called once per frame, from the same callback as the canvas. */
+  setOffset(travelling: readonly Travelling[]): void;
+  /** Light the tiles the hint says to press — one to `size - 1` of them. Empty clears it. */
+  setHint(indices: readonly number[]): void;
   /** Put focus on the run's cursor cell. */
   focusCursor(): void;
   /**
@@ -104,7 +104,7 @@ export function createTileGrid(deps: TileGridDeps): TileGrid {
   root.setAttribute('role', 'grid');
 
   let cells: HTMLButtonElement[] = [];
-  let hint: Move | null = null;
+  let hint: readonly number[] = [];
 
   const cellAt = (index: number): HTMLButtonElement | undefined => cells[index];
 
@@ -177,7 +177,7 @@ export function createTileGrid(deps: TileGridDeps): TileGrid {
         num.textContent = tile === 0 ? '' : String(tile);
         num.style.transform = '';
       }
-      if (hint && hint.from === i) cell.dataset.hint = '1';
+      if (hint.includes(i)) cell.dataset.hint = '1';
       else delete cell.dataset.hint;
     }
   }
@@ -231,28 +231,30 @@ export function createTileGrid(deps: TileGridDeps): TileGrid {
     refresh,
     rebuild: build,
 
-    setOffset(t) {
-      // Written in the SAME callback as the canvas draw, from the same integer offset. The number is
-      // rendered in its DESTINATION cell — the model committed the move already — pushed back
+    setOffset(travelling) {
+      // Written in the SAME callback as the canvas draw, from the same integer offset. A number is
+      // rendered in its DESTINATION cell — the model committed the push already — pushed back
       // toward where it came from. `dx / cell` of a button that is `cell * k` CSS px wide is
       // `dx * k` CSS px, which is exactly what the canvas moved, at every k, with nothing measured.
+      //
+      // ⚠️ THE SPAN MUST FILL THE CELL for that percentage to mean the cell's width. See the rule in
+      // app/css/style.css; without it the number travels a sixth of the distance the tile does.
       const g = deps.geometry();
       for (const cell of cells) {
         const num = cell.firstElementChild as HTMLElement | null;
         if (num && num.style.transform) num.style.transform = '';
       }
-      if (!t) return;
-      const num = cellAt(t.at)?.firstElementChild as HTMLElement | null;
-      if (num) {
-        num.style.transform = `translate(${(100 * t.dx) / g.cell}%, ${(100 * t.dy) / g.cell}%)`;
+      for (const t of travelling) {
+        const num = cellAt(t.at)?.firstElementChild as HTMLElement | null;
+        if (num) num.style.transform = `translate(${(100 * t.dx) / g.cell}%, ${(100 * t.dy) / g.cell}%)`;
       }
     },
 
-    setHint(move) {
-      hint = move;
+    setHint(indices) {
+      hint = indices;
       for (const cell of cells) delete cell.dataset.hint;
-      if (move) {
-        const cell = cellAt(move.from);
+      for (const index of indices) {
+        const cell = cellAt(index);
         if (cell) cell.dataset.hint = '1';
       }
     },

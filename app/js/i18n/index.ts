@@ -40,8 +40,15 @@ export interface I18n {
   describeTile(tile: number): Speakable;
   describeBlank(): Speakable;
   describeObjective(): Speakable;
-  /** "peça 7 para a esquerda" — the phrase every announcement about a move is built from. */
+  /** "peça 7 para a esquerda" — the phrase every announcement about a single tile is built from. */
   describeMove(move: Move): string;
+  /**
+   * The same, for a whole press: "peça 7 para a esquerda" or "três peças para a esquerda".
+   *
+   * One tile reads better without a number, and more than one has to carry it — "peças para a
+   * esquerda" would be the same sentence for a press that moves two and a press that moves four.
+   */
+  describePush(push: readonly Move[]): string;
   direction(d: Direction): string;
   /**
    * Run `fn` whenever the language changes. Returns the unsubscribe.
@@ -89,6 +96,14 @@ export function createI18n(win: Window | null = typeof window === 'undefined' ? 
     direction: (d: Direction) => engineT(`dir.${d}`),
     describeMove: (move: Move) =>
       engineT('a11y.move', { tile: named(move.tile).text, dir: engineT(`dir.${move.direction}`) }),
+    describePush(push: readonly Move[]) {
+      const first = push[0];
+      if (!first) return '';
+      const dir = engineT(`dir.${first.direction}`);
+      return push.length === 1
+        ? engineT('a11y.move', { tile: named(first.tile).text, dir })
+        : engineT('a11y.moveMany', { count: push.length, dir });
+    },
     onChange(fn) {
       if (!win) return () => { /* no window: nothing dispatches, nothing to unsubscribe */ };
       const handler = (): void => fn();

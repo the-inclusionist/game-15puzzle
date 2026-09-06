@@ -44,7 +44,6 @@ import { createBoardView } from '../render/board-view.ts';
 import { createSurface } from '../render/surface.ts';
 import { createTileGrid } from '../ui/tile-grid.ts';
 import { createHud, visionFilter } from '../ui/hud.ts';
-import type { Move } from '../puzzle/types.ts';
 
 /**
  * ⚠️ NOT `store.kJogo()`. That helper hard-codes `JOGO_ID = 'inclusionist'`, so every consumer that
@@ -77,7 +76,9 @@ function boot(): void {
   let size: Size = (SIZES as readonly number[]).includes(savedSize) ? (savedSize as Size) : 4;
   let geometry = boardGeometry(size);
   let run = createRun({ size, seed, solver, board: shuffle(size, createRng(seed)).board });
-  let hint: Move | null = null;
+  // The tiles the hint is lighting — the whole press, one to `size - 1` of them. Not a move and not
+  // an arrow: what a player needs to know is WHICH TILES she is about to shift.
+  let hint: readonly number[] = [];
 
   let highContrast = store.getBool(key('contrast'), false);
   let vision = store.get(key('vision'), 'normal');
@@ -152,14 +153,14 @@ function boot(): void {
 
   function newRun(next: Size, nextSeed: number, announcement: string): void {
     slide.cancel();
-    hint = null;
+    hint = [];
     size = next;
     seed = nextSeed;
     geometry = boardGeometry(size);
     run = createRun({ size, seed, solver, board: shuffle(size, createRng(seed)).board });
     view.setGeometry(geometry);
     grid.rebuild();
-    grid.setHint(null);
+    grid.setHint([]);
     hud.refresh();
     srSay(i18n.t(announcement, { size, need: size * size - 1 }));
   }
@@ -170,18 +171,20 @@ function boot(): void {
     if (result.kind === 'blocked') { srSay(i18n.t('a11y.blocked')); return; }
     if (result.kind === 'blank') { srSay(i18n.t('a11y.blankCell')); return; }
 
-    hint = null;
-    grid.setHint(null);
-    slide.begin(result.move, run.size, geometry.cell + geometry.gap);
+    hint = [];
+    grid.setHint([]);
+    slide.begin(result.push, run.size, geometry.cell + geometry.gap);
     grid.refresh();
     hud.refresh();
 
     // ⚠️ ONE announcement per completed move, never two. `srSay` is `aria-live="polite"`, which
     // QUEUES: splitting the move and the count into two utterances would put the reader a move
     // behind the board and keep it there.
-    srSay(i18n.t('a11y.moved', {
-      tile: i18n.describeTile(result.move.tile).text,
-      dir: i18n.direction(result.move.direction),
+    const first = result.push[0];
+    srSay(i18n.t(result.push.length === 1 ? 'a11y.moved' : 'a11y.movedMany', {
+      tile: i18n.describeTile(first.tile).text,
+      count: result.push.length,
+      dir: i18n.direction(first.direction),
       have: run.tilesHome(),
       need: run.size * run.size - 1,
     }));
@@ -189,15 +192,20 @@ function boot(): void {
   }
 
   function showHint(): void {
-    const moves = run.hint(3);
-    if (!moves.length) { srSay(i18n.t('a11y.hintNone')); return; }
-    hint = moves[0];
+    const presses = run.hint(3);
+    if (!presses.length) { srSay(i18n.t('a11y.hintNone')); return; }
+    // ⚠️ THE TILES, NOT AN ARROW. An arrow says "something arrives here"; what she has to know is
+    // which tiles she is about to shift — and with a push that is up to four of them at once. So the
+    // first press lights its whole line, one to four tiles.
+    const next = presses[0];
+    hint = next.map((m) => m.from);
     grid.setHint(hint);
-    // It REVEALS and never plays: the cursor goes to the tile so the next Enter is hers to press.
-    run.setCursor(hint.from);
+    // It REVEALS and never plays. The cursor goes to the tile she would PRESS — the far end of the
+    // push, since pressing any nearer one would move fewer tiles than the hint is showing.
+    run.setCursor(next[next.length - 1].from);
     grid.refresh();
     grid.focusCursor();
-    srSay(i18n.t('a11y.hint', { moves: moves.map((m) => i18n.describeMove(m)).join(', ') }));
+    srSay(i18n.t('a11y.hint', { moves: presses.map((p) => i18n.describePush(p)).join(', ') }));
   }
 
   // The language can change under a running game; anything JavaScript BUILT has to rebuild. The

@@ -18,6 +18,7 @@ const es: Catalog = {
     'cell.home': 'en su lugar',
     'cell.away': 'fuera de lugar',
     'cell.movable': 'puede deslizarse {dir}',
+    'cell.movableMany': 'puede deslizar {count} fichas {dir}',
     'cell.blank': 'espacio vacío',
 
     'dir.up': 'hacia arriba',
@@ -28,6 +29,7 @@ const es: Catalog = {
     'a11y.boardLabel': 'Rompecabezas deslizante, {size} por {size}',
     'a11y.gridHint': 'Flechas navegan, Enter desliza la ficha',
     'a11y.moved': '{tile} {dir}. {have} de {need} en su lugar',
+    'a11y.movedMany': '{count} fichas {dir}. {have} de {need} en su lugar',
     'a11y.blocked': 'Esta ficha no puede deslizarse ahora',
     'a11y.blankCell': 'Espacio vacío. Nada se desliza desde aquí',
     'a11y.shuffled': 'Mezclado. {size} por {size}, {need} fichas',
@@ -35,6 +37,7 @@ const es: Catalog = {
     'a11y.hint': 'Próximas jugadas: {moves}',
     'a11y.hintNone': 'Ya está resuelto',
     'a11y.move': '{tile} {dir}',
+    'a11y.moveMany': '{count} fichas {dir}',
     'status.solved': 'Resuelto en {moves} jugadas',
     'status.crashed': 'El juego se detuvo. Recargue la página',
 

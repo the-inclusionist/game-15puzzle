@@ -48,12 +48,21 @@ export interface Travelling {
 }
 
 export interface Slide {
-  /** Start animating `move`. Replaces anything in flight — input is refused while one is. */
-  begin(move: Move, size: number, step: number): void;
+  /**
+   * Start animating a PUSH — one tile, or up to `size - 1` of them travelling together. Replaces
+   * anything in flight; input is refused while one is.
+   */
+  begin(push: readonly Move[], size: number, step: number): void;
   /** Advance by `dt` FRAMES. Returns true while something is still moving. */
   advance(dt: number): boolean;
-  /** What is in flight, or null. Both surfaces read THIS and nothing else. */
-  travelling(): Travelling | null;
+  /**
+   * What is in flight. Empty when nothing is.
+   *
+   * ⚠️ ONE `t`, ONE ROUNDING, FOR THE WHOLE PUSH. Every tile in a push travels the same distance in
+   * the same direction, so they share the offset rather than each carrying their own — which is
+   * what keeps three tiles moving as one object instead of three that merely started together.
+   */
+  travelling(): readonly Travelling[];
   active(): boolean;
   /** Drop the animation without finishing it — a size change, a reshuffle, a teardown. */
   cancel(): void;
@@ -73,12 +82,13 @@ export function createSlide(o: SlideOptions = {}): Slide {
   const frames = o.frames ?? 7;
   const reduced = o.reduced ?? (() => false);
 
-  let move: Move | null = null;
+  let push: readonly Move[] = [];
   let size = 0;
   let step = 0;          // cell + gap, in logical pixels
   let t = 1;
 
   const offsets = (): { dx: number; dy: number } => {
+    const move = push[0];
     if (!move) return { dx: 0, dy: 0 };
     const back = 1 - easeOut(t);
     const dxCells = (move.from % size) - (move.to % size);
@@ -92,7 +102,7 @@ export function createSlide(o: SlideOptions = {}): Slide {
 
   return {
     begin(next, boardSize, cellStep) {
-      move = next; size = boardSize; step = cellStep;
+      push = next; size = boardSize; step = cellStep;
       // Reduced motion is ONE branch: the slide is constructed already finished, so the tile
       // teleports and the whole path collapses into the same code. No media query, which is the
       // only way the system preference and the in-game switch can agree.
@@ -100,19 +110,19 @@ export function createSlide(o: SlideOptions = {}): Slide {
     },
 
     advance(dt) {
-      if (!move || t >= 1) return false;
+      if (push.length === 0 || t >= 1) return false;
       t = Math.min(1, t + dt / frames);
-      if (t >= 1) { move = null; return false; }
+      if (t >= 1) { push = []; return false; }
       return true;
     },
 
     travelling() {
-      if (!move) return null;
+      if (push.length === 0) return [];
       const { dx, dy } = offsets();
-      return { tile: move.tile, at: move.to, dx, dy };
+      return push.map((move) => ({ tile: move.tile, at: move.to, dx, dy }));
     },
 
-    active: () => move !== null,
-    cancel() { move = null; t = 1; },
+    active: () => push.length > 0,
+    cancel() { push = []; t = 1; },
   };
 }

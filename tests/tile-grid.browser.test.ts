@@ -261,18 +261,18 @@ describe('registration — the number stays on the tile', () => {
 
     expect(centre()).toBeCloseTo(0, 1);
     for (const dx of [-25, -14, -7, -3, -1, 0]) {
-      m.grid.setOffset({ tile: 6, at: 5, dx, dy: 0 });
+      m.grid.setOffset([{ tile: 6, at: 5, dx, dy: 0 }]);
       expect(centre(), `offset ${dx}`).toBeCloseTo(dx, 1);
     }
-    m.grid.setOffset({ tile: 6, at: 5, dx: 0, dy: g.cell + g.gap });
+    m.grid.setOffset([{ tile: 6, at: 5, dx: 0, dy: g.cell + g.gap }]);
     const r = num.getBoundingClientRect(); const c = cell.getBoundingClientRect();
     expect((r.top + r.height / 2 - (c.top + c.height / 2)) / k).toBeCloseTo(g.cell + g.gap, 1);
   });
 
   it('clears the offset from every other cell, so nothing is left hanging', () => {
     const m = mount(4);
-    m.grid.setOffset({ tile: 6, at: 5, dx: -20, dy: 0 });
-    m.grid.setOffset({ tile: 7, at: 6, dx: -20, dy: 0 });
+    m.grid.setOffset([{ tile: 6, at: 5, dx: -20, dy: 0 }]);
+    m.grid.setOffset([{ tile: 7, at: 6, dx: -20, dy: 0 }]);
     const five = m.cells()[5].firstElementChild as HTMLElement;
     expect(five.style.transform).toBe('');
   });
@@ -281,9 +281,9 @@ describe('registration — the number stays on the tile', () => {
 describe('the hint marker and the dialog guard', () => {
   it('marks the tile to press, and clears it', () => {
     const m = mount(4, solved(4));
-    m.grid.setHint({ tile: 15, from: 14, to: 15, direction: 'right' });
+    m.grid.setHint([14]);
     expect(m.cells()[14].dataset.hint).toBe('1');
-    m.grid.setHint(null);
+    m.grid.setHint([]);
     expect(m.cells()[14].dataset.hint).toBeUndefined();
   });
 
