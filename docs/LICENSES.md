@@ -34,7 +34,7 @@ the Município in alínea `e`.
 **The obligation it creates is implemented here.** The interface carries a "Source code" item
 pointing at this repository, and `tests/agpl-source-offer.node.test.ts` fails if that link is
 removed or silently changed. This repository is the first in the ecosystem to carry it — neither the
-engine nor `hartwig-zdog-chess` does today (a grep for `github.com` or `gitlab.com` across either
+engine nor `game-chess` does today (a grep for `github.com` or `gitlab.com` across either
 `app/` returns nothing).
 
 ⚠️ **The link resolves to a private repository until the *ato*.** That is a limit of the process,
@@ -62,7 +62,7 @@ statement and does **not** inherit the AGPL.
 
 | Component | Licence | Note |
 |---|---|---|
-| `@the-inclusionist/engine` | AGPL-3.0-or-later | Same owner. Linked with `file:` during development; the second external consumer after `hartwig-zdog-chess`. |
+| `@the-inclusionist/engine` | AGPL-3.0-or-later | Same owner. Linked with `file:` during development; the second external consumer after `game-chess`. |
 | PixiJS 7.4.2 | MIT | Pinned to the engine's **exact** version — a second PixiJS in one page is a bug, not a fallback. |
 | Vite, Vitest, Playwright, TypeScript | MIT / Apache-2.0 | Development only; none ships. |
 

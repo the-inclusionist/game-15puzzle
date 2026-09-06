@@ -55,7 +55,7 @@ import type { Move } from '../puzzle/types.ts';
  * The shared `incl_*` scope — language, typography, key remapping — belongs to the CHILD and is used
  * exactly as the engine provides it. That two-scope split is the whole point of `platform/storage`.
  */
-const key = (name: string): string => `incl.15-puzzle.${name}`;
+const key = (name: string): string => `incl.15puzzle.${name}`;
 
 function boot(): void {
   const doc = document;

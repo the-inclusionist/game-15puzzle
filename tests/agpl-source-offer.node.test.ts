@@ -25,8 +25,29 @@ import { catalogs } from '../app/js/i18n/index.ts';
 
 const root = join(import.meta.dirname, '..');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
-  license: string; repository: { url: string };
+  name: string; license: string; repository: { url: string };
 };
+
+/**
+ * Where this working copy actually came from, read out of `.git/config`.
+ *
+ * ⚠️ THIS IS THE ANCHOR, AND THE GATE HAD NONE UNTIL A RENAME PROVED IT. When the repository was
+ * renamed from `pixi-15-puzzle` to `game-15puzzle`, every check below still passed: `SOURCE_URL` and
+ * `package.json` agreed with each other, and GitHub redirects an old name, so the offer pointed at a
+ * repository that no longer had that name and NOTHING said so. Internal consistency is not the same
+ * property as being right, and a gate that only checks two files against each other is a gate that
+ * goes green when both are wrong together.
+ *
+ * The remote is the one statement of the fact that does not live in a file somebody edits by hand.
+ * Read from `.git/config` rather than by spawning git, so this stays a pure node test — and it
+ * THROWS when there is no checkout, because a gate that skips itself is a gate that stopped running.
+ */
+function remoteUrl(): string {
+  const config = readFileSync(join(root, '.git', 'config'), 'utf8');
+  const match = config.match(/\[remote "origin"\][^[]*?url\s*=\s*(\S+)/);
+  if (!match) throw new Error('no origin remote in .git/config: the source offer has nothing to be checked against');
+  return match[1].replace(/\.git$/, '');
+}
 
 async function sourceFiles(dir: string, out: string[] = []): Promise<string[]> {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -87,10 +108,15 @@ describe('every source file carries SPDX, and no copyright line', () => {
 
 describe('the section 13 source offer', () => {
   it('points at the repository this code is actually in', () => {
-    expect(SOURCE_URL).toBe('https://github.com/the-inclusionist/pixi-15-puzzle');
-    // Two statements of the same fact, one machine-readable and one a person can click. They must
-    // not drift: a repository field that moved without the link is an offer pointing at nothing.
+    // Three statements of one fact now, not two: the link a person clicks, the machine-readable
+    // field, and the remote this checkout came from. The third is what a rename cannot fool.
+    expect(SOURCE_URL).toBe(remoteUrl());
     expect(pkg.repository.url).toContain(SOURCE_URL.replace('https://', ''));
+  });
+
+  it('is named the same way the package is, so the two cannot drift apart', () => {
+    // `@the-inclusionist/<repo>` — the shape `game-chess` and `game-zdog-whackwhack` already use.
+    expect(pkg.name).toBe(`@the-inclusionist/${SOURCE_URL.split('/').pop()}`);
   });
 
   it('is over https and names a host, so it is an offer and not a placeholder', () => {

@@ -41,7 +41,7 @@ import type { Run } from '../puzzle/run.ts';
  * That is a limit of the process and not of the implementation: the offer is in place and becomes
  * effective on the day of the ato. Recorded in docs/LICENSES.md rather than left as a promise.
  */
-export const SOURCE_URL = 'https://github.com/the-inclusionist/pixi-15-puzzle';
+export const SOURCE_URL = 'https://github.com/the-inclusionist/game-15puzzle';
 
 export interface HudDeps {
   readonly doc: Document;
