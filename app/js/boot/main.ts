@@ -48,15 +48,21 @@ import { alcanceDoModo } from '@the-inclusionist/engine/render/viz-setters.js';
 import { createTitleScreen } from '../ui/title-screen.ts';
 
 /**
- * ⚠️ NOT `store.kJogo()`. That helper hard-codes `JOGO_ID = 'inclusionist'`, so every consumer that
- * used it would write to `incl.inclusionist.*` and collide with the platformer's own per-game keys
- * on the same browser profile. The CONVENTION of ADR-0028 is right and the function cannot express
- * it yet; three lines here, and an engine issue for `createStorage(gameId)`.
+ * ⚠️ THIS WAS A LOCAL WORKAROUND AND THE ENGINE CLOSED THE REASON FOR IT (ADR-0088, engine #113).
+ *
+ * It used to read: «NOT `store.kJogo()`. That helper hard-codes `JOGO_ID = 'inclusionist'`, so every
+ * consumer that used it would write to `incl.inclusionist.*` and collide with the platformer's own
+ * per-game keys on the same browser profile.» That was true, and the note asked for the fix by name.
+ * The fix landed: `kJogo(jogo, nome)` takes the id from the caller.
+ *
+ * The produced string is IDENTICAL — `'incl.' + jogo + '.' + nome` is what the three lines built — so
+ * no saved key changes and no child loses anything. What changes is who owns the convention: it moves
+ * from a comment in one game to the helper every game shares.
  *
  * The shared `incl_*` scope — language, typography, key remapping — belongs to the CHILD and is used
  * exactly as the engine provides it. That two-scope split is the whole point of `platform/storage`.
  */
-const key = (name: string): string => `incl.15puzzle.${name}`;
+const key = (name: string): string => store.kJogo('15puzzle', name);
 
 function boot(): void {
   const doc = document;
