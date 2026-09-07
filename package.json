@@ -24,10 +24,9 @@
     "test:a11y": "node scripts/axe-check.mjs",
     "validate": "npm run typecheck && vitest run && vite build"
   },
-  "comment:dependencies": "@mintplex-labs/piper-tts-web is declared HERE and it should not have to be. The engine's platform/tts.js does `import('@mintplex-labs/piper-tts-web')` at runtime while its package.json lists the package under devDependencies, so a consumer installing 6.36.1 from the registry cannot resolve it and the build fails outright. Nothing new enters the tree: the same package was already present through the engine's own node_modules while it was linked by path, and shipped in every build. What moved is the DECLARATION. Delete this line and the dependency the day the engine moves it to dependencies or optionalDependencies.",
+  "comment:dependencies": "No neural voice, and that is a decision (ADR-0094). The engine takes `carregarVozNeural` as a PORT; a game that does not pass it narrates through Web Speech, which speaks the right language and weighs nothing, and the audio panel stops offering an engine it could not load. Passing it would mean 27 MB of WASM in the build and 135 MB in node_modules (onnxruntime-web is a non-optional peer of the provider) for a game whose entire spoken content is 'tile 7 to the left'. ADR-0058 targets under 30 MB for a school download; this game is under 1.",
   "dependencies": {
-    "@mintplex-labs/piper-tts-web": "1.0.4",
-    "@the-inclusionist/engine": "6.36.1",
+    "@the-inclusionist/engine": "7.0.1",
     "pixi.js": "7.4.2"
   },
   "devDependencies": {

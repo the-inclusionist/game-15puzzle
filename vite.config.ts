@@ -3,7 +3,7 @@ import { defineConfig } from 'vitest/config'; // not 'vite': vitest/config is wh
 import { playwright } from '@vitest/browser-playwright';
 
 // ============================ THE ENGINE COMES FROM THE REGISTRY ============================
-// `"@the-inclusionist/engine": "6.36.1"`, pinned exact. It was `file:../SP-the-inclusionist-tracer`
+// `"@the-inclusionist/engine": "7.0.1"`, pinned exact. It was `file:../SP-the-inclusionist-tracer`
 // while nothing was published — a bootstrap, and the reason CI could never go green, since no runner
 // has a sibling directory. ADR-0072 settled where it comes from instead (public npmjs, because a
 // volunteer without a token cannot install from GitHub Packages), and it is there now.

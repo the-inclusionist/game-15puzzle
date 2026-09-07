@@ -78,19 +78,24 @@ ADR-0068 §4, and ADR-0067 §5 is why it lives there rather than in a `.github` 
 record declares. It runs with `a11y: true`, which is not a default: the input exists so that skipping
 pillar 2 is a visible line rather than an absence.
 
-The engine now comes from **public npmjs**, pinned exact at `6.36.1` (ADR-0072), so the gate has
+The engine comes from **public npmjs**, pinned exact at `7.0.1` (ADR-0072), so the gate has
 everything it needs: `npm ci` resolves from the registry and there is no sibling directory to be
 missing. That was the last thing standing between this repository and a green pipeline.
 
-⚠️ **One dependency is declared here that should not have to be.** The engine's `platform/tts.js`
-imports `@mintplex-labs/piper-tts-web` at runtime while listing it under `devDependencies`, so a
-consumer installing from the registry cannot resolve it and the build fails outright. Nothing new
-enters the tree — the same package was already there through the engine's own `node_modules` while
-it was linked by path — but the declaration had to move. `package.json` carries the trigger to
-remove it.
-
 To develop against a local engine checkout: `npm install ../SP-the-inclusionist-tracer`, which is
 ADR-0036's loop — link locally, pin remotely — and revert before committing.
+
+## No neural voice, on purpose
+
+The engine takes the neural text-to-speech engine as a **port** (ADR-0094): a game passes
+`carregarVozNeural` if it wants one. This game does not, so narration goes through Web Speech —
+which speaks the right language, works offline and weighs nothing — and the audio panel stops
+*offering* an engine it could not load, rather than offering one that never arrives.
+
+The trade is measured, not assumed. Passing the port would put **27 MB of WASM** in the build and
+**135 MB** in every `node_modules` (`onnxruntime-web` is a non-optional peer of the provider), for a
+game whose entire spoken content is "tile 7 to the left". ADR-0058 targets under 30 MB for a school
+download; **this game's whole `dist/` is 640 KB in seven files.**
 
 ## Credits and licences
 
