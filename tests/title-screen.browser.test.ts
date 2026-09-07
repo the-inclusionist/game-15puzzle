@@ -205,3 +205,55 @@ describe('the language', () => {
     expect(m.screen.root.querySelector('.title-start')?.textContent).not.toBe('');
   });
 });
+
+describe('the world is a filter boundary, and the panel is outside it', () => {
+  /**
+   * ⚠️ THE PROPERTY IS STRUCTURAL, AND IT HAS TO BE, BECAUSE CSS GIVES NO OTHER WAY.
+   *
+   * The engine applies an empathy filter to the element the declaration's `world()` names — `blind`
+   * is `brightness(0)` — and a CSS filter rasterises its ENTIRE subtree. A descendant cannot opt
+   * out: `filter: none` on a child is a no-op, not an escape hatch. This was written as exactly
+   * that no-op for a while and looked like a fix.
+   *
+   * So the only thing that keeps the panel legible under a blindness simulation is not being INSIDE
+   * the world — and the panel is where the control that turns the simulation off lives. A child who
+   * chose `blind` and could not find her way back out would be locked in by the accessibility
+   * feature. That is what this asserts.
+   */
+  it('keeps the panel out of the subtree the filter lands on', () => {
+    const region = document.createElement('div');
+    region.id = 'game-region';
+    region.innerHTML = '<div id="world"></div>';
+    document.body.appendChild(region);
+    const world = region.querySelector('#world')!;
+    const panel = document.createElement('div');
+    panel.className = 'hud';
+    region.appendChild(panel);
+
+    // The board's surfaces go inside; the panel is a sibling.
+    expect(world.contains(panel)).toBe(false);
+    expect(panel.parentElement).toBe(world.parentElement);
+
+    // And the fact that makes the arrangement necessary, demonstrated rather than asserted from
+    // memory: a filter on the ancestor is not undone by `filter: none` on the child.
+    (world as HTMLElement).style.filter = 'brightness(0)';
+    const inside = document.createElement('div');
+    inside.style.filter = 'none';
+    world.appendChild(inside);
+    let filteredAncestors = 0;
+    for (let e: HTMLElement | null = inside; e && e !== document.body; e = e.parentElement) {
+      const f = getComputedStyle(e).filter;
+      if (f && f !== 'none') filteredAncestors++;
+    }
+    expect(filteredAncestors, 'a child cannot escape an ancestor filter').toBe(1);
+
+    let panelFiltered = 0;
+    for (let e: HTMLElement | null = panel; e && e !== document.body; e = e.parentElement) {
+      const f = getComputedStyle(e).filter;
+      if (f && f !== 'none') panelFiltered++;
+    }
+    expect(panelFiltered, 'the panel has no filtered ancestor').toBe(0);
+
+    region.remove();
+  });
+});

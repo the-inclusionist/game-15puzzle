@@ -48,6 +48,10 @@
     position: relative;
   }
 
+  /* The same box as the region, so every percentage in here still resolves against 320k by 180k.
+     It exists to be a FILTER BOUNDARY, not a layout one — see the note in index.html. */
+  #world { position: absolute; inset: 0; }
+
   /* The canvas fills whatever ui/layout sized the region to. It is scenery: the buttons above it
      are the hit targets, and it is aria-hidden from boot. */
   #board-canvas {

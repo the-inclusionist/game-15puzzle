@@ -24,8 +24,10 @@
     "test:a11y": "node scripts/axe-check.mjs",
     "validate": "npm run typecheck && vitest run && vite build"
   },
+  "comment:dependencies": "@mintplex-labs/piper-tts-web is declared HERE and it should not have to be. The engine's platform/tts.js does `import('@mintplex-labs/piper-tts-web')` at runtime while its package.json lists the package under devDependencies, so a consumer installing 6.36.1 from the registry cannot resolve it and the build fails outright. Nothing new enters the tree: the same package was already present through the engine's own node_modules while it was linked by path, and shipped in every build. What moved is the DECLARATION. Delete this line and the dependency the day the engine moves it to dependencies or optionalDependencies.",
   "dependencies": {
-    "@the-inclusionist/engine": "file:../SP-the-inclusionist-tracer",
+    "@mintplex-labs/piper-tts-web": "1.0.4",
+    "@the-inclusionist/engine": "6.36.1",
     "pixi.js": "7.4.2"
   },
   "devDependencies": {

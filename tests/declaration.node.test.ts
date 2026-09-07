@@ -24,7 +24,7 @@ const solver = createSolver();
 /** A declaration over a run that the test can swap under it — which is how a size change works. */
 function harness(size: number, seed = 3) {
   let run: Run = createRun({ size, seed, solver, board: shuffle(size, createRng(seed)).board });
-  const declaration = createPuzzleDeclaration({ run: () => run, i18n });
+  const declaration = createPuzzleDeclaration({ run: () => run, i18n, worldSelector: '#game-region' });
   return {
     declaration,
     run: () => run,
@@ -38,6 +38,27 @@ function harness(size: number, seed = 3) {
 }
 
 describe('the engine accepts it', () => {
+  it('declares the space as orthogonal, read by compass', () => {
+    const t = harness(4).declaration.topology();
+    expect(t.kind).toBe('grid');
+    if (t.kind !== 'grid') return;
+    // ⚠️ NOT a preference. A tile slides along a row or a column and never round a corner, so L¹ is
+    // what the space IS — and until the engine carried `move`, `distance` was Chebyshev for every
+    // grid and under-reported this game by up to half.
+    expect(t.move).toBe('orthogonal');
+    // A board is looked at from above, where north and south mean something. `clock` is for a
+    // side-on platformer, where they do not.
+    expect(t.frame).toBe('compass');
+  });
+
+  it('declares the element that IS the world — both surfaces, not just the canvas', () => {
+    const world = harness(4).declaration.world();
+    expect(world).toEqual({ kind: 'element', selector: '#game-region' });
+    // ⚠️ THE REGION AND NOT THE CANVAS. The tiles are drawn into the canvas and their numbers are
+    // DOM over it; a world naming only the canvas would let `blind` black the art and leave the
+    // numbers readable — a simulation showing an adult a condition they are not experiencing.
+  });
+
   it('reports no conformance problem at any size', () => {
     for (const n of [3, 4, 5]) {
       expect(conformanceProblems(harness(n).declaration), `size ${n}`).toEqual([]);
@@ -54,9 +75,16 @@ describe('the engine accepts it', () => {
   // change would leave the sonar measuring against the old grid, silently.
   it('follows a size change with no rebuild of the declaration', () => {
     const h = harness(3);
-    expect(h.declaration.topology).toEqual({ kind: 'grid', cols: 3, rows: 3 });
+    // The union has a `hotspots` arm with no `size`, so the narrowing is not ceremony: it is the
+    // type asking which kind of space this is before reading its extent.
+    const extent = (): readonly number[] => {
+      const t = h.declaration.topology();
+      if (t.kind === 'hotspots') throw new Error('a sliding puzzle is not a list of hotspots');
+      return t.size;
+    };
+    expect(extent()).toEqual([3, 3]);
     h.resize(5);
-    expect(h.declaration.topology).toEqual({ kind: 'grid', cols: 5, rows: 5 });
+    expect(extent()).toEqual([5, 5]);
     expect(conformanceProblems(h.declaration)).toEqual([]);
   });
 
@@ -80,7 +108,7 @@ describe('roleAt — the four roles, and only four', () => {
 
   it('separates a tile that can slide from one that cannot', () => {
     const run = createRun({ size: 4, seed: 1, solver, board: solved(4) });
-    const d = createPuzzleDeclaration({ run: () => run, i18n });
+    const d = createPuzzleDeclaration({ run: () => run, i18n, worldSelector: '#game-region' });
     // Displace one tile so something is out of place and beside the blank.
     run.activate(14);
     const board = run.board();
@@ -151,7 +179,7 @@ describe('focusOf', () => {
 
   it('points the way the tile under the cursor would travel', () => {
     const run = createRun({ size: 4, seed: 1, solver, board: solved(4) });
-    const d = createPuzzleDeclaration({ run: () => run, i18n });
+    const d = createPuzzleDeclaration({ run: () => run, i18n, worldSelector: '#game-region' });
     run.setCursor(14);                       // tile 15, blank to its right
     expect(d.focusOf(0)?.heading).toBe('e');
     run.setCursor(11);                       // tile 12, blank below it
@@ -222,9 +250,14 @@ describe('targetsOf', () => {
   // will say "two" where the truth is four moves. `Topology.grid` has no way to say "orthogonal
   // only". Accepted for v1; the fix is an engine amendment (`metric?: 'manhattan'`), not a local
   // workaround, and this test exists so the day it lands is a day this line changes.
-  it('is measured by the engine in KING steps, which under-reports a sliding puzzle', () => {
-    const t = harness(4).declaration.topology;
-    expect(distance(t, { x: 0, y: 0 }, { x: 2, y: 2 })).toBe(2);   // four slides, in truth
+  // ⚠️ THIS TEST USED TO ASSERT THE DEFECT. It read "measured in KING steps, which under-reports a
+  // sliding puzzle", pinned the answer 2 where the truth was 4, and carried the engine amendment it
+  // wanted as a comment. The amendment landed: `move: 'orthogonal'` makes `distance` L¹, so the
+  // sonar now says what a player would count.
+  it('is measured in SLIDES, now that the topology can say the space is orthogonal', () => {
+    const t = harness(4).declaration.topology();
+    expect(distance(t, { x: 0, y: 0 }, { x: 2, y: 2 })).toBe(4);
+    expect(distance(t, { x: 0, y: 0 }, { x: 3, y: 0 })).toBe(3);
   });
 });
 

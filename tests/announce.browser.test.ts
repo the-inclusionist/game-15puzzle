@@ -188,7 +188,7 @@ describe('what the hint says', () => {
 describe('the declaration answers in the interface language', () => {
   it('names a tile the way the current locale names it', async () => {
     const run = createRun({ size: 4, seed: 1, solver, board: solved(4) });
-    const declaration = createPuzzleDeclaration({ run: () => run, i18n });
+    const declaration = createPuzzleDeclaration({ run: () => run, i18n, worldSelector: '#game-region' });
     const name = declaration.nameAt({ x: 0, y: 0 });
     expect(name?.text).toContain('1');
     srSay(name!.text);

@@ -94,7 +94,8 @@ statement and does **not** inherit the AGPL.
 
 | Component | Licence | Note |
 |---|---|---|
-| `@the-inclusionist/engine` | AGPL-3.0-or-later | Same owner. Linked with `file:` during development; the second external consumer after `game-chess`. |
+| `@the-inclusionist/engine` | AGPL-3.0-or-later | Same owner. From public npmjs, pinned exact at 6.36.1 (ADR-0072); this repository is its second external consumer after `game-chess`. |
+| `@mintplex-labs/piper-tts-web` | MIT | The engine's neural voice, imported by its `platform/tts.js` at runtime. Declared here only because the engine lists it as a devDependency; see the note in `package.json`. |
 | PixiJS 7.4.2 | MIT | Pinned to the engine's **exact** version — a second PixiJS in one page is a bug, not a fallback. |
 | Vite, Vitest, Playwright, TypeScript | MIT / Apache-2.0 | Development only; none ships. |
 | **Press Start 2P** by CodeMan38 | **SIL OFL 1.1** | The title screen's typeface, and only the title screen's — see below. Vendored at `app/public/fonts/`, with `press-start-2p.OFL.txt` beside it. |

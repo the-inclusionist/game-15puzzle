@@ -11,7 +11,17 @@
 <!-- MARKUP REQUIRED by createGame: #game-region, #sr-status, #sr-alert. Anything missing does not
      throw — it lands in engine.problems, which boot/main.ts asserts is empty. -->
 <div id="stage-wrap">
-  <div id="game-region" tabindex="-1"></div>
+  <div id="game-region" tabindex="-1">
+    <!-- ⚠️ THE WORLD IS THIS ELEMENT, NOT THE REGION, and the distinction is load-bearing rather
+         than tidy. The declaration's `world()` names what the engine may treat as the game, and the
+         engine puts an empathy filter THERE: `blind` is `brightness(0)`, applied to a whole subtree.
+         A CSS filter on an ancestor rasterises everything under it and a descendant CANNOT opt out —
+         `filter: none` on a child is not an escape hatch, it is a no-op. So the panel has to be a
+         SIBLING of the world and not a child of it, or the simulation blacks out the very control
+         that turns the simulation off, and a child is locked inside it.
+         The canvas, the tile grid and the title screen go in here. The panel stays outside. -->
+    <div id="world"></div>
+  </div>
 </div>
 
 <p class="hint" data-i18n="app.keys">Setas navegam &middot; Enter desliza a peca &middot; K sonar</p>

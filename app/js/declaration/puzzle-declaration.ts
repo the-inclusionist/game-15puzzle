@@ -31,14 +31,23 @@
 // and a reader that said nothing about it would hide the most important fact on the board. `nameAt`
 // names the blank and returns `null` only for a spot that is not on the grid at all.
 //
-// ⚠️ AND `topology` IS A GETTER, WHICH THE CONTRACT DID NOT ANTICIPATE. It is declared as a readonly
-// VALUE while the other five fields are functions, so a game whose board resizes has no declared way
-// to say so. A getter satisfies the type and answers live. Recorded because a future engine
-// consumer that CACHED topology would go stale against a resized board — that is the engine's to
-// fix (an ADR there, not here: ADR-0068 §5), and this comment is the trail to it.
+// ⚠️ `topology` WAS A GETTER HERE, AND THE ENGINE FIXED THE CONTRACT INSTEAD. It used to be declared
+// as a readonly VALUE while its siblings were functions, so a game whose board resizes had no
+// declared way to say so; a getter satisfied the type, and a getter that satisfies an interface is a
+// TypeScript coincidence rather than a contract — nothing told the next author it had to keep
+// answering live. ADR-0084 in the engine made it `topology()`, citing this game as the evidence, so
+// the workaround is gone and the field is simply a function like the rest.
+//
+// ⚠️ AND `world()` IS NEW AND MANDATORY, and it is the other half of the same story. This game's
+// visible content is DOM over a canvas, so the engine's empathy modes — which used to spare the DOM
+// layer — inverted here: `blind` blacked the canvas and left the numbers perfectly legible. The
+// engine's answer is that the GAME says which element is the world, and the engine applies
+// world-scoped effects there and only there. Mandatory rather than defaulted, and the record's
+// reason for that is worth keeping: blindfold chess exists, so a pure-DOM game is not one where
+// empathy makes no sense — it is one where it asks more of whoever writes it.
 
 import type {
-  Focus, GameDeclaration, Heading, Objective, Role, Speakable, Spot,
+  Focus, GameDeclaration, Heading, Objective, Role, Speakable, Spot, Topology, WorldScope,
 } from '@the-inclusionist/engine/core/contract.js';
 import { homeOf, pushOf, pushableFrom } from '../puzzle/board.ts';
 import { inBounds, indexOf, spotOf } from '../puzzle/types.ts';
@@ -51,18 +60,55 @@ const HEADING: Readonly<Record<Direction, Heading>> = {
   up: 'n', down: 's', left: 'w', right: 'e',
 };
 
-export interface DeclarationDeps {
-  /** The CURRENT run. A getter, because changing board size discards the run object entirely. */
+/**
+ * What a SENTENCE about a cell needs, which is less than a declaration needs.
+ *
+ * Narrower on purpose: `describeCell` reads the board and the language and has no business knowing
+ * where the world element is, so a caller that only wants a label should not have to invent one.
+ */
+export interface CellDeps {
   run(): Run;
   readonly i18n: I18n;
+}
+
+export interface DeclarationDeps extends CellDeps {
+  /**
+   * The selector of the element that IS the game — everything the engine should treat as the world.
+   *
+   * Injected rather than hardcoded because the host owns its own markup: the same declaration has to
+   * be constructible in a test that mounts into a scratch element.
+   */
+  readonly worldSelector: string;
 }
 
 export function createPuzzleDeclaration(deps: DeclarationDeps): GameDeclaration {
   const size = (): number => deps.run().size;
 
   return {
-    get topology() {
-      return { kind: 'grid', cols: size(), rows: size() } as const;
+    topology(): Topology {
+      return {
+        kind: 'grid',
+        size: [size(), size()],
+        // ⚠️ THE OTHER DEBT THIS RELEASE CLOSED. `distance` used to be Chebyshev for every grid —
+        // king's steps, right for chess and for a platformer — so the sonar under-reported a sliding
+        // puzzle by up to half: "two" where the truth was four presses. `move` now carries the
+        // metric, and `orthogonal` is L¹. A tile slides along a row or a column and never round a
+        // corner, so this is not a preference, it is what the space is.
+        move: 'orthogonal',
+        // A board is looked at from above: north, south, east, west are the words that mean
+        // something here. `clock` is for a side-on platformer, where they do not.
+        frame: 'compass',
+      };
+    },
+
+    /**
+     * Both surfaces at once, and that is the point. The board's tiles are drawn into the canvas and
+     * their numbers are DOM laid over it, so a world that named only the canvas would let `blind`
+     * black the art and leave the numbers readable — a simulation that shows an adult a condition
+     * they are not experiencing. The region contains both.
+     */
+    world(): WorldScope {
+      return { kind: 'element', selector: deps.worldSelector };
     },
 
     // Where the "no timer" decision LIVES: not merely absent, DECLARED. WCAG 2.2.1 (Timing
@@ -143,7 +189,7 @@ export function createPuzzleDeclaration(deps: DeclarationDeps): GameDeclaration 
  * It lives beside the declaration rather than in the grid because it is the same seven fields said
  * as a sentence — `roleAt` and `nameAt` are what it reads, and nothing else.
  */
-export function describeCell(deps: DeclarationDeps, index: number): string {
+export function describeCell(deps: CellDeps, index: number): string {
   const run = deps.run();
   const n = run.size;
   const { x, y } = spotOf(index, n);

@@ -44,6 +44,7 @@ import { createBoardView } from '../render/board-view.ts';
 import { createSurface } from '../render/surface.ts';
 import { createTileGrid } from '../ui/tile-grid.ts';
 import { createHud, visionFilter } from '../ui/hud.ts';
+import { alcanceDoModo } from '@the-inclusionist/engine/render/viz-setters.js';
 import { createTitleScreen } from '../ui/title-screen.ts';
 
 /**
@@ -61,6 +62,10 @@ function boot(): void {
   const doc = document;
   const region = doc.getElementById('game-region');
   if (!region) throw new Error('#game-region is missing: the host contract is not met');
+  // The world: canvas, board and title screen. The panel is deliberately NOT in here — see the note
+  // in index.html, and `applyLook` below.
+  const world = doc.getElementById('world');
+  if (!world) throw new Error('#world is missing: the host contract is not met');
 
   const search = new URLSearchParams(location.search);
   const debug = search.get('debug') === 'true';
@@ -86,7 +91,7 @@ function boot(): void {
   const systemReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   let reducedMotion = store.getBool(key('motion'), systemReduced);
 
-  const declaration = createPuzzleDeclaration({ run: () => run, i18n });
+  const declaration = createPuzzleDeclaration({ run: () => run, i18n, worldSelector: '#world' });
 
   const engine = createGame({
     declaration,
@@ -105,7 +110,7 @@ function boot(): void {
   engine.nav.attach();      // createGame does not — see the header
 
   const surface = createSurface();
-  region.appendChild(surface.view);
+  world.appendChild(surface.view);
 
   const slide = createSlide({ reduced: () => reducedMotion });
   const view = createBoardView({
@@ -123,7 +128,7 @@ function boot(): void {
     actionOf: (code) => engine.keyboard.actionOf(code, 0),
     onActivate: (index) => activate(index),
   });
-  region.appendChild(grid.root);
+  world.appendChild(grid.root);
 
   const hud = createHud({
     doc,
@@ -156,7 +161,7 @@ function boot(): void {
     reducedMotion: () => reducedMotion,
     onStart: () => start(),
   });
-  region.appendChild(titleScreen.root);
+  world.appendChild(titleScreen.root);
 
   const cenaJogo = { nome: 'playing' };
   const cenaTitulo = {
@@ -187,8 +192,29 @@ function boot(): void {
     region!.style.setProperty('--accent', palette.accent);
     region!.style.setProperty('--title-bg', palette.backdrop);
     region!.style.setProperty('--title-ink', palette.tileAway);
-    // ONE filter, on the region, reaching the canvas AND the numbers over it. See ui/hud.
-    region!.style.filter = visionFilter(vision);
+
+    /* ===================== THE VISION FILTER IS THE ENGINE'S JOB NOW =====================
+     *
+     * This used to be `region.style.filter = ...`, written here because the engine's own path spared
+     * the DOM layer for the empathy modes — which inverted the simulation in a game whose visible
+     * content IS DOM: `blind` blacked the canvas and left the numbers perfectly legible. The engine
+     * closed that by making the game DECLARE which element is the world, and `aplicarFiltroDeVisao`
+     * puts the filter there. Same surface, and now the reach rule lives in one place.
+     */
+    engine.aplicarFiltroDeVisao(visionFilter(vision), alcanceDoModo(vision));
+
+    /* ⚠️ AND THE PANEL IS OUTSIDE THE WORLD, WHICH IS THE ONLY THING THAT ACTUALLY WORKS.
+     *
+     * This was `hud.root.style.filter = 'none'` for a while, and it was a no-op dressed as a fix: a
+     * CSS filter on an ancestor rasterises its whole subtree, and a descendant cannot opt out of it.
+     * `brightness(0)` on the world would have blacked the panel — and the panel holds the control
+     * that turns the simulation off, so a child who chose `blind` would have been locked inside it
+     * with no visible way out. The engine's own exemption for `#game-region .overlay` has the same
+     * shape and, for a descendant, the same limit.
+     *
+     * Being a SIBLING is what makes it true, so it is markup rather than a style: index.html puts
+     * the canvas, the board and the title screen inside `#world`, and the panel beside it.
+     */
   }
 
   function newRun(next: Size, nextSeed: number, announcement: string): void {
@@ -281,10 +307,10 @@ function boot(): void {
     grid.setOffset(travelling);
     surface.render();
   }, 2, {
-    aoFalhar: (error) => {
-      console.error(error);
-      srAlert(i18n.t('status.crashed'));
-    },
+    // The engine's own, which narrates through the TTS rather than only writing to a live region —
+    // it is delivered ready and not installed, precisely because the game owns the ticker. The extra
+    // line here is for whoever is reading a console, which the engine has no business assuming.
+    aoFalhar: (error) => { console.error(error); engine.aoFalhar(error); },
   });
 
   if (debug) {
