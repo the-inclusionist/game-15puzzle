@@ -8,12 +8,25 @@
 # because ADR-0067 §5 says a repository is created when a RECORD declares its address, and no record
 # declares one for a workflows repository.
 #
-# ⚠️ THIS CANNOT GO GREEN YET, AND SAYING SO HERE IS THE POINT. The gate runs `npm ci`, and this
-# game's engine dependency is `file:../SP-the-inclusionist-tracer` — a sibling directory that does
-# not exist on a runner. ADR-0072 settles where it comes from instead (public npmjs, because a
-# volunteer without a token cannot install from GitHub Packages), so the first green run arrives
-# when the engine is published and this repository's dependency becomes a version rather than a
-# path. Until then the same gates run locally through `npm run validate`.
+# ⚠️ THIS FILE CARRIED A WARNING THAT DESCRIBED A DAY THAT HAD PASSED, and leaving it there made a red
+# tick look expected. It said «THIS CANNOT GO GREEN YET… this game's engine dependency is
+# `file:../SP-the-inclusionist-tracer` — a sibling directory that does not exist on a runner». That was
+# true when it was written and stopped being true without anyone editing the file.
+#
+# 📏 MEASURED on 2026-09-08, on three sides: `package.json` declares `7.0.1`, `package-lock.json` resolves
+# `node_modules/@the-inclusionist/engine` to `7.0.1`, and `npm view @the-inclusionist/engine@7.0.1` answers
+# from public npmjs. ADR-0072 chose that registry — a volunteer without a token cannot install from GitHub
+# Packages — and the choice has been delivered.
+#
+# 🔴 THE RED HAD A SECOND CAUSE, AND IT WAS A SETTING RATHER THAN CODE. The engine repository is private and
+# its `actions/permissions/access` was `none`, so no repository in the organisation could resolve
+# `uses: …/game-ci.yml@main`. The run started with ZERO jobs and was marked failed — which is why there was
+# never a log to read, in this repository or in the three other callers, all red for the same reason. The
+# setting became `organization` on 2026-09-08.
+#
+# 📌 So the honest sentence today is the plain one: this caller is expected to go green, and the first run
+# after the setting changed is the evidence. `npm run validate` still runs the same gates locally, which is
+# what made the wait survivable.
 name: ci
 
 on:
