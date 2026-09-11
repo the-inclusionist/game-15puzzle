@@ -16,9 +16,21 @@
 //
 // The organisation's reusable workflow does exactly that when a game calls it with `a11y: true`.
 //
-// ⚠️ NO EXCLUSIONS, AND THAT IS DELIBERATE. The engine's own script excludes the third-party VLibras
-// widget, which it must, because nobody here controls that markup. This game mounts no third-party
-// widget, so an exclusion list would be an empty allowance sitting there waiting to be widened.
+// ⚠️ STILL NO EXCLUSION LIST — AND THE SENTENCE THAT USED TO BE HERE IS NOW FALSE, so it is replaced
+// rather than left standing. It read: «This game mounts no third-party widget, so an exclusion list
+// would be an empty allowance sitting there waiting to be widened.» This game now mounts one: the
+// gov.br VLibras plugin, which is what gives the accessibility bar's Libras button something to
+// translate with.
+//
+// The engine's own script answers that with an axe EXCLUSION. This one answers with a BLOCK instead,
+// in the route below, and the difference is worth the two lines: an exclusion lets the widget's DOM
+// into the page and then tells axe to look away — which is one selector away from being widened to
+// cover our own markup on a bad afternoon. Blocking the script means the third-party DOM never
+// arrives, so there is nothing to look away from, and every node axe sees is ours.
+//
+// What that costs, stated rather than hidden: the widget's own accessibility is never measured here.
+// It never could be — nobody in this repository can fix it — but «not measured» is a different claim
+// from «clean», and the gate should not be read as making the second one.
 
 import { chromium } from 'playwright';
 import { AxeBuilder } from '@axe-core/playwright';
@@ -46,7 +58,9 @@ try {
   //
   // Blocking it here rather than behind a test flag keeps the production path the one that ships: a
   // flag would make the behaviour a child actually gets the only behaviour nothing exercises.
-  await page.route(/huggingface\.co|hf\.co|cdn\.jsdelivr\.net|unpkg\.com|webgazer/, (r) => r.abort());
+  // `vlibras.gov.br` is here for the second reason, not the first: it is small, but it injects DOM
+  // this repository does not own and cannot fix. See the note at the top of the file.
+  await page.route(/huggingface\.co|hf\.co|cdn\.jsdelivr\.net|unpkg\.com|webgazer|vlibras\.gov\.br/, (r) => r.abort());
 
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(URL, { waitUntil: 'networkidle' });

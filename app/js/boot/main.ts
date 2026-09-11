@@ -24,7 +24,8 @@
 //     in a game whose visible content is DOM.
 
 import { createGame } from '@the-inclusionist/engine';
-import { srAlert, srSay } from '@the-inclusionist/engine/core/a11y-sr.js';
+import { srAlert, srSay, setVlibrasSay } from '@the-inclusionist/engine/core/a11y-sr.js';
+import { vlibrasSay, vlTick } from '@the-inclusionist/engine/ui/vlibras.js';
 import { startLoop } from '@the-inclusionist/engine/core/loop.js';
 import { initLayout, layout } from '@the-inclusionist/engine/ui/layout.js';
 import * as store from '@the-inclusionist/engine/platform/storage.js';
@@ -200,6 +201,16 @@ function boot(): void {
    * says the platform should be the one asking; until it does, the game asks.
    */
   void baixarPesados({ apenas: PESADOS.filter((p) => p.id.startsWith('voz:')).map((p) => p.id) });
+
+  /**
+   * LIBRAS — the announcements reach the interpreter, not only the live region.
+   *
+   * The bar's button and the mode already existed; `createGame` wires the icon to `toggleLibras`
+   * itself. What this line adds is the OTHER half: `srSay`/`srAlert` fan out to the Libras speaker as
+   * well, so everything this game already announces — a slide, a size change, a solved board — is
+   * translated instead of only spoken. Without it the mode toggles a widget that is handed nothing.
+   */
+  setVlibrasSay(vlibrasSay);
 
   if (engine.problems.length) console.warn('host contract:', engine.problems);
   engine.nav.attach();      // createGame does not — see the header
@@ -388,6 +399,21 @@ function boot(): void {
     // something is still Tab-reachable, and the engine installs no focus trap anywhere.
     const open = engine.nav.sharedDialogOpen() !== null || !playing();
     if (open !== dialogWasOpen) { dialogWasOpen = open; grid.setInert(open); }
+
+    /**
+     * ⚠️ THE ENGINE CALLS THIS ONE DECORATIVE AND IT IS NOT — read the source, not the doc comment.
+     *
+     * `vlTick` says of itself «Já não decide nada — o estado é nosso», which is true of the case it
+     * was written about and false of the one that matters. `librasOpen` is restored from storage at
+     * module load; `_vlOpen`, the flag `vlibrasSay` actually tests, starts `false` and is only ever
+     * assigned inside `toggleLibras`. So a child who turned Libras on yesterday comes back with the
+     * mode ON and the translator MUTE, and stays that way until she toggles it off and on again.
+     *
+     * `vlTick()` is the only thing that reconciles the two, which makes it load-bearing exactly for
+     * the returning user — the person least likely to report it, because from her side the feature
+     * simply does not work. One assignment per frame.
+     */
+    vlTick();
 
     slide.advance(dt);
     const travelling = slide.travelling();

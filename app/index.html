@@ -47,5 +47,41 @@
 <svg id="cvd" class="sr-only" aria-hidden="true"></svg>
 
 <script type="module" src="./js/boot/main.ts"></script>
+
+<!-- ============================= LIBRAS, AND IT IS ONLINE-ONLY =============================
+     The engine's accessibility bar already mounts a Libras button and already wires it to
+     `toggleLibras` (create-game.js:253) — the MODE has existed here since the bar went up. What was
+     missing was a translator for it to drive, which is this: four hooks the gov.br plugin looks for,
+     and the plugin.
+
+     ⚠️ THIS IS THE ONLY THIRD-PARTY, NETWORK-REQUIRED THING ON THE PAGE, and saying so is the point.
+     Everything else this game needs is in its own build, including the font. The engine's own note
+     beside `ui/vlibras.ts` says why it is interim: the Dev decided the interpreter should appear in
+     FRONT of the screen while audio plays and leave afterwards, with nothing to click, and the gov.br
+     widget cannot do that — it is a docked panel that translates the text of an element you click.
+     ADR-0010's pillar 2 therefore plans an interpreter of our own. Until then, a button that toggles
+     a mode and translates nothing is the half-truth worth removing, so the widget is mounted.
+
+     The plugin re-parents itself: it attaches `#vlibras-access-wrapper` straight onto `<body>` and
+     leaves the wrapper below empty. The engine learned that the expensive way — it used to read the
+     panel's OPEN state from this block's geometry, the block became 747x0, and the detector answered
+     "open" for ever: the layout reserved 380px for an interpreter that was not there and pushed the
+     canvas to `left: -136`. So nothing here may be measured, and nothing here is.
+
+     ⚠️ AND NO `integrity=` HASH, WHICH IS A DECISION AND NOT AN OVERSIGHT. Subresource Integrity
+     needs a versioned URL; `vlibras.gov.br/app/vlibras-plugin.js` is a single unversioned address
+     that the government updates in place. A pinned hash would hold until their next release and then
+     turn "the interpreter is out of date" into "the interpreter silently never loads" — the failure
+     lands on a deaf child, and the only trace is a console warning nobody is reading. The exposure it
+     would buy against is a compromise of a federal accessibility endpoint that the same page is
+     already trusting to render on top of it. If gov.br ever publishes a versioned URL, this becomes
+     an ordinary omission and should be fixed. -->
+<div vw class="enabled">
+  <div vw-access-button class="active"></div>
+  <div vw-plugin-wrapper><div class="vw-plugin-top-wrapper"></div></div>
+</div>
+<script src="https://vlibras.gov.br/app/vlibras-plugin.js"></script>
+<script>try{ if(window.VLibras) new window.VLibras.Widget('https://vlibras.gov.br/app'); }
+  catch(e){ console.warn('VLibras unavailable (offline?).', e); }</script>
 </body>
 </html>
