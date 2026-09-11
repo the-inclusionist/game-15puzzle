@@ -153,12 +153,29 @@ and a correction, which means a child who needs high contrast *and* colour corre
 have one — the exclusivity ADR-0011's supersession refused. `setTemaDoJogador` and
 `setCorrecaoDoJogador` are two fields because they are two questions.
 
-📌 **What moved out and did not arrive anywhere**, said plainly rather than left to be discovered:
-the select also offered the EMPATHY simulations — `sim-protan`, `sim-deuter`, `sim-tritan` and the
-five low-vision modes. Those are not adaptations a child uses; they are what an adult turns on to
-feel what she experiences. They belong in the engine's `empatia` panel, which a consumer game has to
-build and register itself, and this one does not. **Blind survives** (the bar's 🦯), and every
-adaptation survives. The demonstration modes are gone until somebody decides where they live.
+## Experimenting with how other people see
+
+The **Experimentar** button opens a panel of nine ways of seeing — three colour-blindness
+simulations, five low-vision ones and blindness — and the child plays the puzzle inside whichever she
+picks.
+
+⚠️ **These are lesson content, not a grown-up's demonstration**, which is the Dev's correction and the
+reason the panel exists at all: *"as crianças usam, mas não como adaptação, mas para experimentar no
+jogo questões de acessibilidade e inclusão trabalhados em sala de aula"*. They were briefly lost when
+the vision select was retired, and that was a removed feature rather than a retired convenience.
+
+Three properties it is built around, each with a gate:
+
+- **The way out is a row, not a close button.** A child inside `lv-tunnel` sees a keyhole and inside
+  `blind` sees nothing; leaving has to be the same shape as arriving, in the same list, never
+  disabled. The panel lives OUTSIDE `#world`, so the filter that blacks the board leaves it lit.
+- **A simulation never runs over an adaptation**, and the refusal is visible and explained rather than
+  silent (ADR-0076). Whoever turned on high contrast turned it on because she needs it.
+- **Every mode delivers what it names.** The engine splits a low-vision mode into a CSS filter and an
+  overlay texture the consumer supplies; this game supplied none, so `lv-tunnel` was a faint blur with
+  no tunnel and `lv-macular` was nothing at all. The overlays are painted now — a mode that
+  under-delivers teaches that tunnel vision is a slight blur, which is worse than a mode that is
+  absent.
 
 ## Libras
 

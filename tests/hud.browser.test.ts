@@ -37,6 +37,7 @@ function mount() {
     initial: { size: 4, reducedMotion: false },
     onShuffle: () => calls.push('shuffle'),
     onHint: () => calls.push('hint'),
+    onEmpathy: () => calls.push('empathy'),
     onSize: (n: Size) => calls.push(`size:${n}`),
     onReducedMotion: (on) => calls.push(`motion:${on}`),
   });

@@ -327,3 +327,105 @@
      miss that passes review by eye every time. It is the line that tells a keyboard player which
      keys exist. */
   p.hint { color: #8b949e; margin: 0; padding: 10px; text-align: center; font-size: 12px; flex: 0 0 auto; }
+
+  /* ========================= THE EMPATHY PANEL =========================
+     It lives in the chrome column beside the HUD, which is what keeps it legible: the empathy filter
+     lands on #world and a CSS filter rasterises its whole subtree, so a panel inside the world would
+     go dark under `blind` — and the row that turns the simulation OFF would be the first thing the
+     simulation hid.
+
+     The row and button classes are the ENGINE's (`.ctrl-row`, `.mode-btn`, `.opt-hint`), so the panel
+     inherits the catalogue's look instead of inventing a second one. Only the box is ours. */
+  .empathy-panel {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    max-height: 60%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: calc(var(--ui-fs, 16px) * 0.4);
+    font-size: var(--ui-fs, 16px);
+    line-height: 1.3;
+    color: #c9d1d9;
+    background: #0d151d;
+    border-top: 1px solid #2b3a4a;
+  }
+  .empathy-panel h2 { margin: 0 0 .3em; font-size: 1em; }
+  .empathy-panel .empathy-intro { margin: 0 0 .5em; color: #8b949e; }
+  .empathy-modes { margin: 0; padding: 0; border: 0; }
+  .empathy-modes legend { padding: 0; font-weight: 700; }
+  /* The row is a <label>, so the whole line is the hit target — 44 px at the k=2 floor comes from the
+     padding plus the line box, not from the radio alone (WCAG 2.5.5). */
+  .empathy-panel .ctrl-row {
+    display: flex;
+    gap: .5em;
+    align-items: flex-start;
+    padding: calc(var(--ui-fs, 16px) * 0.35) 0;
+    cursor: pointer;
+    min-height: var(--tap, 44px);
+  }
+  .empathy-panel .ctrl-row input { margin-top: .2em; flex: 0 0 auto; }
+  .empathy-panel .opt-hint { display: block; color: #8b949e; }
+  /* ⚠️ NOT `color: grey and hope`. The refusal carries its own word, and it has to stay readable —
+     ADR-0076 asks for visible AND explained, and a reason nobody can read is neither. */
+  .empathy-panel .empathy-why { display: block; color: #d29922; }
+  .empathy-panel .ctrl-row:has(input:disabled) strong,
+  .empathy-panel .ctrl-row:has(input:disabled) .opt-hint { color: #6e7681; }
+  #game-region[data-contrast="high"] .empathy-panel {
+    background: #000;
+    color: #fff;
+    border-top-color: #fff;
+  }
+  #game-region[data-contrast="high"] .empathy-panel .empathy-intro,
+  #game-region[data-contrast="high"] .empathy-panel .opt-hint { color: #fff; }
+  #game-region[data-contrast="high"] .empathy-panel .empathy-why { color: #ffd33d; }
+
+  /* ========================= THE LOW-VISION OVERLAY =========================
+     The half of a simulation a CSS filter cannot carry. The engine's own delivery is a filter PLUS a
+     texture it asks the consumer for (`lvOverlayTex`); this game supplies the texture as one painted
+     element over the board, because the board is a canvas with DOM digits on top and an overlay drawn
+     INTO the canvas would leave the numbers sharp — a lie in the other direction.
+
+     ⚠️ It sits inside #world on purpose: it is the simulation, so it belongs on the side of the
+     boundary the simulation owns. The panel that switches it off is outside, and that is what keeps
+     the way out lit. */
+  #lv-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+  }
+  /* No attribute, no overlay — every mode that is not low vision, including `blind`. `blur` and
+     `haze` carry an attribute but paint nothing: their character is entirely in the engine's filter,
+     and an empty transparent box over the board costs nothing and keeps the rule simple. */
+  #lv-overlay:not([data-lv]) { display: none; }
+
+  /* Peripheral loss: a clear centre falling off to nothing. The stop positions are what make it a
+     TUNNEL rather than a vignette — the dark reaches well inside the frame. */
+  #lv-overlay[data-lv="tunnel"] {
+    background: radial-gradient(circle at 50% 50%,
+      rgba(0,0,0,0) 0%, rgba(0,0,0,0) 18%, rgba(0,0,0,.82) 42%, rgba(0,0,0,.98) 62%);
+  }
+  /* Central loss — the opposite shape, and the one a filter cannot even approximate: the periphery
+     stays perfectly sharp while the middle, where a person is looking, goes. */
+  #lv-overlay[data-lv="macular"] {
+    background: radial-gradient(ellipse 32% 38% at 50% 50%,
+      rgba(90,90,90,.97) 0%, rgba(90,90,90,.9) 45%, rgba(90,90,90,0) 78%);
+  }
+  /* Diabetic retinopathy: scattered floaters and blots, not a smooth field. Several small gradients
+     rather than one, because what it costs a reader is that the gaps are UNPREDICTABLE. */
+  #lv-overlay[data-lv="diabetic"] {
+    background:
+      /* ⚠️ `ellipse` AND NOT `circle`, AND THE DIFFERENCE COST A SILENT FAILURE. A `circle` radius
+         must be a LENGTH — a percentage is invalid there — so `radial-gradient(circle 9% at …)`
+         made the browser drop the whole `background` declaration and this mode painted NOTHING,
+         while the mode still announced itself and still applied its blur. Measured, not reviewed:
+         the count of gradients in the computed style was zero. */
+      radial-gradient(ellipse 9% 12% at 34% 38%, rgba(0,0,0,.9) 0%, rgba(0,0,0,0) 100%),
+      radial-gradient(ellipse 6% 8% at 62% 30%, rgba(0,0,0,.85) 0%, rgba(0,0,0,0) 100%),
+      radial-gradient(ellipse 11% 15% at 58% 68%, rgba(0,0,0,.8) 0%, rgba(0,0,0,0) 100%),
+      radial-gradient(ellipse 5% 7% at 26% 72%, rgba(0,0,0,.85) 0%, rgba(0,0,0,0) 100%),
+      radial-gradient(ellipse 7% 10% at 78% 55%, rgba(0,0,0,.75) 0%, rgba(0,0,0,0) 100%);
+  }
+  /* `blur` and `haze` are carried by the engine's own CSS filter and need no shape at all — they are
+     listed here as absences so the next reader does not go looking for a rule that never existed. */
+
