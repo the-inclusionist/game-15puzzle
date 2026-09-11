@@ -60,6 +60,13 @@ try {
   // flag would make the behaviour a child actually gets the only behaviour nothing exercises.
   // `vlibras.gov.br` is here for the second reason, not the first: it is small, but it injects DOM
   // this repository does not own and cannot fix. See the note at the top of the file.
+  //
+  // ⚠️ AND `cdn.jsdelivr.net` IS NOW LOAD-BEARING FOR THAT BLOCK, WHICH IT WAS NOT WHEN IT WAS ADDED.
+  // It went in as one of the heavy model CDNs. Measured on the built page: the gov.br plugin mirrors
+  // ITSELF there — `cdn.jsdelivr.net/gh/spbgovbr-vlibras/vlibras-portal@v7.12.2/app/vlibras-plugin.js`
+  // plus its images — so blocking only `vlibras.gov.br` would let the widget in through the back door
+  // and the exclusion-free claim above would quietly stop being true. Trimming this pattern because
+  // "this game loads no models from jsdelivr" would be correct about the old reason and wrong now.
   await page.route(/huggingface\.co|hf\.co|cdn\.jsdelivr\.net|unpkg\.com|webgazer|vlibras\.gov\.br/, (r) => r.abort());
 
   await page.setViewportSize({ width: 1280, height: 800 });
