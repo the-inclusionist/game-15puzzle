@@ -55,8 +55,17 @@ describe('the documents name only versions this repository installs', () => {
     });
   }
 
-  // The other half, and it is the one the upgrade actually needed: the engine is the single most
-  // important version in this repository, and both documents are supposed to say which one.
+  /**
+   * The other half, and it is the one the upgrade actually needed: the engine is the single most
+   * important version in this repository, and both documents are supposed to say which one.
+   *
+   * ⚠️ IT ALSO CAUGHT SOMETHING THIS FILE WAS NOT WRITTEN FOR, on the 9.0.0 upgrade: `npm install -D`
+   * wrote `^9.0.0` into `devDependencies`, quietly undoing the exact pin ADR-0072 asks for — the
+   * catalogue's manifest names an exact version per game, and a range makes "which engine did this
+   * build use" a question about the day rather than about the lockfile. The documents said `9.0.0`,
+   * the manifest said `^9.0.0`, and the mismatch failed here. Keeping the assertion on the LITERAL
+   * range rather than on a parsed version is what made that visible, so it stays literal.
+   */
   it('both documents name the engine version that is installed', () => {
     // The DEV range is the one that says which engine is installed here; the peer range is a
     // requirement addressed to a consumer and is deliberately wider.

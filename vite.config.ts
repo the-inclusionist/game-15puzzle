@@ -4,7 +4,7 @@ import { playwright } from '@vitest/browser-playwright';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // ============================ THE ENGINE COMES FROM THE REGISTRY ============================
-// `"@the-inclusionist/engine": "^8.0.0"` as a PEER and `8.0.0` exact as a devDependency (ADR-0140 §4). It was `file:../SP-the-inclusionist-tracer`
+// `"@the-inclusionist/engine": "^9.0.0"` as a PEER and `9.0.0` exact as a devDependency (ADR-0140 §4). It was `file:../SP-the-inclusionist-tracer`
 // while nothing was published — a bootstrap, and the reason CI could never go green, since no runner
 // has a sibling directory. ADR-0072 settled where it comes from instead (public npmjs, because a
 // volunteer without a token cannot install from GitHub Packages), and it is there now.

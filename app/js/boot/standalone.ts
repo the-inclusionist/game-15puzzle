@@ -108,11 +108,11 @@ function mount(): void {
        */
       a11yBarHost: a11yBar,
     },
-    // No gamepad wizard and no pause actor. Declared rather than deduced from a getter returning null.
-    // `semMenuDePausa` no longer exists: ADR-0120 made the pause undeclinable, and `pauseHost` decides
-    // only WHERE the card hangs.
-    declines: { semAssistenteDePad: true, semAtorDePausa: true },
-    isNavigable: cartridge.hooks.isNavigable,
+    // ⚠️ EVERY GAME-OWNED FIELD COMES FROM THE CARTRIDGE, SPREAD RATHER THAN LISTED. Engine 9.0.0
+    // exports `GanchosDoCartucho` — the fifteen fields ADR-0139 §1 puts on the game's side, after the
+    // erratum that moved five of them — so listing them here again would be a second copy of a list
+    // that has already been wrong once. `declines` was one of the five, and it lived here.
+    ...cartridge.hooks,
     /**
      * THE NEURAL VOICE — the host's half, which is why it is here and not in the cartridge.
      *
@@ -133,9 +133,6 @@ function mount(): void {
      * camera.
      */
     baixarPesados: false,
-    // The sonar's listener position is the GAME's to state — ADR-0139 puts every callback INTO the
-    // game on its side of the split, and this one reads the cursor.
-    sonarPlayers: cartridge.hooks.sonarPlayers,
   });
 
   /**
@@ -153,36 +150,6 @@ function mount(): void {
   // and the mode are the engine's; this is the translator being handed the text.
   setVlibrasSay(vlibrasSay);
 
-  /**
-   * ⚠️ `engine.problems` IS NO LONGER EMPTY, AND THE CONVERSION IS WHY — MEASURED, NOT SUPPOSED.
-   *
-   * It holds exactly one line: «mundo declarado não encontrado: #world». `createGame` resolves the
-   * declaration's `world()` selector AT BOOT (`create-game.js:120`, one of the nine eager reads
-   * ADR-0139 §5 counted), and `#world` does not exist at boot any more — the CARTRIDGE creates it,
-   * inside the region, when `create(ctx)` runs, which is necessarily after this call.
-   *
-   * 📏 THE EFFECT IS DIAGNOSTIC ONLY, and that was checked rather than hoped: `aplicarFiltroDeVisao`
-   * resolves the selector at the point of USE, so the blindness simulation still lands on the world
-   * and spares the bar and the panel. The boot protocol measures one filtered ancestor over the
-   * board and zero over both controls.
-   *
-   * 📌 AND IT IS EVIDENCE FOR A RECORD THAT IS ALREADY ACCEPTED AND NOT BUILT. ADR-0142 gives the
-   * engine `mount(declaration, hooks)` precisely to re-derive those eager reads, and says
-   * `engine.problems` is not to be trusted «in platform mode». This shows the claim is wider than the
-   * record states: it goes stale the moment a game stops pre-declaring its own DOM, which is exactly
-   * what the cartridge contract asks every game to do. One shell, one game, and the diagnostic is
-   * already wrong.
-   *
-   * So the line is NAMED rather than tolerated. A tolerated defect hides the next one; a named one
-   * fails loudly the moment anything else joins it.
-   */
-  const KNOWN = ['mundo declarado não encontrado: #world'];
-  const unexpected = engine.problems.filter((p) => !KNOWN.includes(p));
-  if (unexpected.length) throw new Error(`host contract: ${unexpected.join(' | ')}`);
-  if (engine.problems.length !== KNOWN.length) {
-    console.warn('host contract: a known problem stopped being reported — the engine may have grown mount()');
-  }
-
   engine.nav.attach();      // createGame does not — see the header
 
   const instance = cartridge.create({
@@ -191,12 +158,32 @@ function mount(): void {
     // ⚠️ THE SHELL BUILDS THE STREAM, ONE PER CARTRIDGE (ADR-0141). The engine's `core/rng` exports
     // `rnd`/`randInt`/`shuffle`/`reseed` bound to ONE module-level generator, so two cartridges
     // importing them draw from the same stream and a `reseed` in one repositions the other's. With
-    // one game on one page that is invisible, which is exactly why the rule needs a gate and not care.
+    // one game on one page that is invisible, which is exactly why the rule needs a gate, not care.
     rng: createRng,
     // ⚠️ NOT handed `location` itself. In the platform there is one address for every cartridge, so
     // a game reading `location.search` reads another game's parameters — and this one reads `?seed=`.
     params: new URLSearchParams(location.search),
   });
+
+  /**
+   * MOUNT AFTER CREATE, AND THE ORDER IS THE WHOLE POINT (ADR-0142, engine 9.0.0).
+   *
+   * 📏 MEASURED BEFORE THIS LINE EXISTED: `engine.problems` held «mundo declarado não encontrado:
+   * #world». `createGame` resolves the declaration's `world()` selector at boot, and after the
+   * cartridge conversion `#world` is created by `create(ctx)` — which necessarily runs later. The
+   * effect was diagnostic only, because `aplicarFiltroDeVisao` resolves the selector at the point of
+   * use, but a diagnostic that is wrong is worse than one that is missing.
+   *
+   * ⚠️ AND IT SHOWED THE RECORD'S CLAIM WAS NARROWER THAN THE DEFECT. ADR-0142 says `problems` and
+   * `alcance` are not to be trusted «in platform mode»; this is one shell and one game, and they were
+   * already wrong. They go stale the moment a game stops pre-declaring its own DOM, which is what the
+   * cartridge contract asks of every game. `mount` re-derives them with the world in the document.
+   *
+   * 📌 It also LANDS the hooks: `mount(declaration, ganchos)` is how the fifteen game-owned fields
+   * reach an engine that may serve several cartridges. Here there is one, and the call is the same.
+   */
+  engine.mount(cartridge.declaration, cartridge.hooks);
+  if (engine.problems.length) throw new Error(`host contract: ${engine.problems.join(' | ')}`);
 
   /**
    * ⚠️ THE PAGE IS THE SHELL'S, SO PUBLISHING IS TOO. The cartridge hands its verification surface

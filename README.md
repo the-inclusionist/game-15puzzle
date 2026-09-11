@@ -102,7 +102,7 @@ ADR-0068 §4, and ADR-0067 §5 is why it lives there rather than in a `.github` 
 record declares. It runs with `a11y: true`, which is not a default: the input exists so that skipping
 pillar 2 is a visible line rather than an absence.
 
-The engine comes from **public npmjs**, pinned exact at `8.0.0` (ADR-0072), so the gate has
+The engine comes from **public npmjs**, pinned exact at `9.0.0` (ADR-0072), so the gate has
 everything it needs: `npm ci` resolves from the registry and there is no sibling directory to be
 missing. That was the last thing standing between this repository and a green pipeline.
 

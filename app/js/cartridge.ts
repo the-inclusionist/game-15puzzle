@@ -40,7 +40,9 @@ import type { Size } from './render/geometry.ts';
 import type { Run } from './puzzle/run.ts';
 import type { Solver } from './puzzle/solver.ts';
 import type { GameDeclaration } from '@the-inclusionist/engine/core/contract.js';
-import type { SonarPlayer } from '@the-inclusionist/engine/platform/audio-sonar.js';
+// ⚠️ THE BARE SPECIFIER, not a `boot/…` subpath: the engine's export map routes `.` to
+// `dist-pkg/boot/create-game` and publishes no `./boot/*` pattern at all.
+import type { GanchosDoCartucho } from '@the-inclusionist/engine';
 
 /** This game's own generator, never the engine's shared stream — ADR-0141, and `puzzle/rng.ts` for why. */
 export interface Rng {
@@ -116,11 +118,18 @@ export interface Cartridge {
  *
  * `isNavigable` is here for the same reason and answers TRUE: the engine captures keys on the window
  * while one of its own dialogs is open, and this game draws no menu of its own to compete with it.
+ *
+ * ⚠️ AND `declines` MOVED HERE FROM THE SHELL, WHICH IS AN ERRATUM CORRECTING ME. The cartridge
+ * contract listed «whether `declines` is host-owned or game-owned» as open, and this repository
+ * answered it wrongly — it sat in `standalone.ts` until engine 9.0.0 shipped `GanchosDoCartucho` with
+ * the answer. The record's own erratum says why: ADR-0139 §1 counted fifteen fields out of twenty and
+ * left five on the wrong side — `declines`, `getPauseActs`, `setPauseActor`, `setTemaDoJogador` and
+ * `setCorrecaoDoJogador`. Its own test settles them: a PAGE cannot say what a GAME does not have.
+ *
+ * 📌 The type is now the ENGINE's, not a local shape. A local interface with two members was a second
+ * place for this list to drift, and it had already drifted once.
  */
-export interface CartridgeHooks {
-  isNavigable(): boolean;
-  sonarPlayers(): SonarPlayer[];
-}
+export type CartridgeHooks = GanchosDoCartucho;
 
 /** The narrow slice of the engine this game actually uses. Typed here so the cartridge does not
  *  depend on the whole `Engine` shape while the contract is still moving. */
@@ -194,6 +203,9 @@ export function createCartridge(): Cartridge {
     dicts: catalogs,
 
     hooks: {
+      // No gamepad wizard and no pause actor. Declared rather than deduced from a getter returning
+      // null — and `semMenuDePausa` no longer exists at all: ADR-0120 made the pause undeclinable.
+      declines: { semAssistenteDePad: true, semAtorDePausa: true },
       isNavigable: () => true,
       // The sonar needs to know where the listener stands. On a grid that is the cursor's square, so
       // the engine can measure to the targets the declaration hands it. It forwards through the same
