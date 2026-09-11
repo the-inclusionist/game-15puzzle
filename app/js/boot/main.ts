@@ -67,21 +67,46 @@ import { createTitleScreen } from '../ui/title-screen.ts';
  */
 const key = (name: string): string => store.kJogo('15puzzle', name);
 
-function boot(): void {
-  const doc = document;
-  const region = doc.getElementById('game-region');
-  if (!region) throw new Error('#game-region is missing: the host contract is not met');
-  // The world: canvas, board and title screen. The panel is deliberately NOT in here — see the note
-  // in index.html, and `applyLook` below.
-  const world = doc.getElementById('world');
-  if (!world) throw new Error('#world is missing: the host contract is not met');
-  // The chrome column, and the bar the engine fills. Both outside `#world`: they are the controls
-  // that turn an empathy simulation OFF, and a filter on an ancestor cannot be undone by a child.
-  const side = doc.getElementById('side');
-  const a11yBar = doc.getElementById('a11y-bar');
-  if (!side || !a11yBar) throw new Error('#side / #a11y-bar are missing: the host contract is not met');
+/**
+ * WHAT THE PAGE HANDS THE GAME — everything below this line is about the DEVICE, never about tiles.
+ *
+ * ⚠️ THIS IS A SEAM CUT AHEAD OF A CONVERSION, AND IT IS CHEAP EXACTLY BECAUSE IT IS CUT EARLY.
+ * ADR-0139 divides `CreateGameOptions` in two by asking whether a PAGE could answer a field without
+ * knowing which game is running. `doc`, `win`, the elements and the query string are all on the
+ * page's side; the board, the solver and the declaration are on the game's. Today one function holds
+ * both halves and resolves the page half itself, from globals.
+ *
+ * Taking the page half as an ARGUMENT changes nothing at runtime and buys two things. `params` is the
+ * one that is not cosmetic: in the platform there is ONE address for every cartridge, so a game
+ * reading `location.search` directly reads another game's parameters — and this game reads `?seed=`,
+ * which is the example the contract itself uses. And `boot(host)` is what makes the eventual
+ * `src/standalone.ts` a thirty-line extraction rather than an excavation.
+ *
+ * What is NOT done here, deliberately: the factory, `teardown()`, the library build. ADR-0068 §6
+ * puts one game through end to end first and it is not this one, so converting against a contract
+ * with four open questions would be building to be rebuilt.
+ */
+interface PageHost {
+  readonly doc: Document;
+  readonly win: Window;
+  /** The element the engine treats as the game. Everything this file creates lands inside it. */
+  readonly region: HTMLElement;
+  /** ⚠️ The world is INSIDE the region and is not the region — see index.html. The empathy filter
+   *  lands here, and a CSS filter rasterises its whole subtree. */
+  readonly world: HTMLElement;
+  /** The chrome column and the bar the engine fills. Both outside `#world`, because they are the
+   *  controls that turn an empathy simulation OFF and a child cannot escape an ancestor's filter. */
+  readonly side: HTMLElement;
+  readonly a11yBar: HTMLElement;
+  readonly cvdHost: HTMLElement | null;
+  /** ⚠️ NOT `location.search`. What the SHELL decided this game may read from the address. */
+  readonly params: URLSearchParams;
+}
 
-  const search = new URLSearchParams(location.search);
+function boot(host: PageHost): void {
+  const { doc, win, region, world, side, a11yBar } = host;
+
+  const search = host.params;
   const debug = search.get('debug') === 'true';
 
   // Recorded rather than hidden. ADR-0049 wants determinism, and determinism is only useful if the
@@ -89,7 +114,7 @@ function boot(): void {
   const seedParam = Number(search.get('seed'));
   let seed = Number.isFinite(seedParam) && seedParam > 0 ? seedParam >>> 0 : Date.now() >>> 0;
 
-  const i18n = createI18n(window);        // BEFORE createGame — see the header
+  const i18n = createI18n(win);        // BEFORE createGame — see the header
   const solver = createSolver();
 
   const savedSize = Number(store.get(key('size'), '4'));
@@ -102,7 +127,7 @@ function boot(): void {
 
   let highContrast = store.getBool(key('contrast'), false);
   let vision = store.get(key('vision'), 'normal');
-  const systemReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  const systemReduced = win.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   let reducedMotion = store.getBool(key('motion'), systemReduced);
 
   /**
@@ -128,7 +153,7 @@ function boot(): void {
   const engine = createGame({
     declaration,
     host: {
-      doc, win: window, cvdHost: doc.getElementById('cvd'),
+      doc, win, cvdHost: host.cvdHost,
       /**
        * WHERE THE SEVEN ACCESSIBILITY ICONS GO, and naming it is the whole fix.
        *
@@ -290,14 +315,14 @@ function boot(): void {
   function applyLook(): void {
     const palette = highContrast ? HIGH : NORMAL;
     view.setPalette(palette);
-    region!.dataset.contrast = highContrast ? 'high' : 'normal';
+    region.dataset.contrast = highContrast ? 'high' : 'normal';
     // ⚠️ THE DIGIT'S COLOUR COMES FROM THE SAME TABLE THE TILE BODY DOES. The stylesheet carries
     // fallbacks so the page is never unstyled, but a fallback that silently becomes the real value
     // is how the measured contrast ratios in render/palette stop describing what is on screen.
-    region!.style.setProperty('--tile-ink', palette.ink);
-    region!.style.setProperty('--accent', palette.accent);
-    region!.style.setProperty('--title-bg', palette.backdrop);
-    region!.style.setProperty('--title-ink', palette.tileAway);
+    region.style.setProperty('--tile-ink', palette.ink);
+    region.style.setProperty('--accent', palette.accent);
+    region.style.setProperty('--title-bg', palette.backdrop);
+    region.style.setProperty('--title-ink', palette.tileAway);
 
     /* ===================== THE VISION FILTER IS THE ENGINE'S JOB NOW =====================
      *
@@ -387,7 +412,7 @@ function boot(): void {
 
   initLayout({ numJogadores: () => 1 });
   layout();
-  window.addEventListener('resize', layout);
+  win.addEventListener('resize', layout);
   applyLook();
 
   engine.cenas.push(cenaTitulo);
@@ -435,7 +460,7 @@ function boot(): void {
   });
 
   if (debug) {
-    (window as unknown as Record<string, unknown>).__puzzle = {
+    (win as unknown as Record<string, unknown>).__puzzle = {
       seed: () => seed,
       run: () => run,
       declaration,
@@ -458,4 +483,39 @@ function boot(): void {
   }
 }
 
-boot();
+/**
+ * THE SHELL — and it is everything this module does on import.
+ *
+ * ⚠️ THIS IS THE OTHER HALF OF THE SEAM, AND IT IS DELIBERATELY THE ONLY SIDE-EFFECTING CODE IN THE
+ * FILE. Resolving five elements out of `document`, reading the address and starting are all
+ * statements about a PAGE — the things ADR-0139 puts on the host's side. Read it as the first draft
+ * of `src/standalone.ts`: the day the cartridge conversion happens, this function moves out whole and
+ * `boot` is exported instead of called.
+ *
+ * The checks throw rather than warn because every one of them is a missing accessibility surface, not
+ * a missing decoration: no `#a11y-bar` is a child who cannot reach blind mode before the game starts,
+ * which is the exact defect `engine.problems` reported against this game, and a page half-built is
+ * worse than a page that says so.
+ */
+function mountFromDocument(): void {
+  const doc = document;
+  const need = (id: string): HTMLElement => {
+    const el = doc.getElementById(id);
+    if (!el) throw new Error(`#${id} is missing: the host contract is not met`);
+    return el;
+  };
+  boot({
+    doc,
+    win: window,
+    region: need('game-region'),
+    world: need('world'),
+    side: need('side'),
+    a11yBar: need('a11y-bar'),
+    // Optional by the engine's own signature: without it the six colour-vision filters are simply
+    // not built, which is a degradation and not a broken contract.
+    cvdHost: doc.getElementById('cvd'),
+    params: new URLSearchParams(location.search),
+  });
+}
+
+mountFromDocument();
