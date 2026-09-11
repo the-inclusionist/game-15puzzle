@@ -111,6 +111,25 @@ export function createPuzzleDeclaration(deps: DeclarationDeps): GameDeclaration 
       return { kind: 'element', selector: deps.worldSelector };
     },
 
+    /**
+     * ONE. Nothing in this game is ever held together with anything else.
+     *
+     * The unit of play is a PRESS: one tile, one finger, one key. Arrows move the cursor and Enter
+     * slides — never at the same time — and on a touch screen the whole interaction is a tap. There
+     * is no run-plus-walk-plus-jump here, so there is no chord to be unable to make.
+     *
+     * ⚠️ AND Ctrl+Home DOES NOT MAKE IT TWO. This field asks what the game REQUIRES, not what it
+     * accepts: Home and End work alone, the arrows reach every cell, and the modifier only widens a
+     * jump that is already available without it. Counting a convenience as a requirement would
+     * report a barrier that is not there, which is the same kind of lie as missing one.
+     *
+     * FUNCTION and not a value, like `topology` — a game with phases changes what it demands between
+     * them. This one does not, and answers the same number every time on purpose.
+     */
+    holdsAtOnce(): number {
+      return 1;
+    },
+
     // Where the "no timer" decision LIVES: not merely absent, DECLARED. WCAG 2.2.1 (Timing
     // Adjustable) is inapplicable because of this line, and scanning may take as long as it likes.
     tick: 'player',

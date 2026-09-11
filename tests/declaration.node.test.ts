@@ -88,6 +88,27 @@ describe('the engine accepts it', () => {
     expect(conformanceProblems(h.declaration)).toEqual([]);
   });
 
+  // MANDATORY IN THE ENGINE, AND THE MANDATE IS THE POINT. The record's argument is that an optional
+  // field is answered by SILENCE, and silence here decides for the child - decided by whoever did not
+  // think about it. The engine's own `conformanceProblems` refuses a declaration without it, which is
+  // how this arrived: three assertions in this file went red the moment the package was upgraded.
+  it('declares that it holds ONE position at a time', () => {
+    for (const n of [3, 4, 5]) {
+      const held = harness(n).declaration.holdsAtOnce();
+      expect(held, `size ${n}`).toBe(1);
+      expect(Number.isInteger(held) && held >= 1, `size ${n}`).toBe(true);
+    }
+  });
+
+  // The distinction the field turns on: what the game REQUIRES, not what it accepts. Ctrl+Home is a
+  // convenience over Home, which works alone, and the arrows reach every cell - so nothing here needs
+  // two positions at once, and counting the modifier would report a barrier that is not there.
+  it('needs no pointer, and says nothing rather than saying so', () => {
+    // `needsPointer` is optional with a safe default of false, and the engine explicitly declines to
+    // make three hundred games write `() => false`. A keyboard operates this one completely.
+    expect(harness(4).declaration.needsPointer).toBeUndefined();
+  });
+
   it('declares the tick as the player\'s, which is what makes WCAG 2.2.1 inapplicable', () => {
     expect(harness(4).declaration.tick).toBe('player');
   });
