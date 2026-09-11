@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { defineConfig } from 'vitest/config'; // not 'vite': vitest/config is what types the `test` field
 import { playwright } from '@vitest/browser-playwright';
+import { VitePWA } from 'vite-plugin-pwa';
 
 // ============================ THE ENGINE COMES FROM THE REGISTRY ============================
 // `"@the-inclusionist/engine": "^8.0.0"` as a PEER and `8.0.0` exact as a devDependency (ADR-0140 §4). It was `file:../SP-the-inclusionist-tracer`
@@ -44,8 +45,65 @@ const LIB = {
   external: [/^@the-inclusionist\/engine/, 'pixi.js'],
 };
 
+/**
+ * THE APP BUILD IS A PWA, AND THE PRECACHE LIST IS THE WHOLE DECISION.
+ *
+ * ADR-0140's third gate is that the app build emits a service worker and a manifest; five of the six
+ * games were not PWAs, and `game-2048`'s README promised «offline as a PWA» over a build with
+ * neither. That is the promise being made true here.
+ *
+ * ⚠️ AND THE 27 MB WASM IS DELIBERATELY NOT PRECACHED. Workbox's default ceiling is 2 MB, so the
+ * honest choices were to raise it and have a first visit download 28 MB before the page is usable,
+ * or to leave the voice runtime to be fetched when the voice is actually wanted. The second is the
+ * one that matches ADR-0116's «first day ONLINE, then offline-first»: the shell, the board and every
+ * control are offline after the first visit, and the neural voice — which `baixarPesados` already
+ * fetches in the background, into the engine's own Cache Storage bucket — is not held hostage to the
+ * page's own precache. Precaching it twice, in two caches, would be the duplicated fact as bytes.
+ *
+ * 📌 `lang` is pt-BR and `scope` is './'. Both are named because the platformer got them wrong in the
+ * only two ways available: `"lang": "en"` on a product delivered in Portuguese, and `"scope": "/"`,
+ * which claims the whole origin — fatal the day more than one thing is served from it.
+ */
+const PWA = VitePWA({
+  registerType: 'autoUpdate',
+  workbox: {
+    globPatterns: ['**/*.{js,css,html,woff2,txt}'],
+    globIgnores: ['**/ort-wasm*', '**/*.wasm'],
+  },
+  manifest: {
+    name: 'Inclusionist 15-Puzzle',
+    short_name: '15-Puzzle',
+    lang: 'pt-BR',
+    dir: 'ltr',
+    scope: './',
+    start_url: './',
+    display: 'standalone',
+    background_color: '#05070f',
+    theme_color: '#05070f',
+  },
+});
+
 export default defineConfig(({ mode }) => ({
   root: 'app',
+  // ⚠️ THE LIB BUILD IS NOT A PWA, and that is the general rule rather than an exception: a cartridge
+  // inside a platform must not install a second service worker on the platform's origin.
+  plugins: mode === 'lib' ? [] : [PWA],
+  /**
+   * ⚠️ NO `public/` IN THE CARTRIDGE, AND IT COST A GATE TO NOTICE. The first lib build copied
+   * `app/public/fonts/` into `dist-lib/`, which ADR-0117's confirmation forbids in as many words:
+   * «A CARTRIDGE DECLARES NO DELIVERY — no font file, no voice, no runtime in a game's own package or
+   * `dist`. ⚠️ Asserted as ABSENCE on the cartridge side too, or «the platform has it» would pass
+   * while every game shipped its own copy anyway.» Six cartridges each carrying their own copy of a
+   * typeface is the arithmetic that record exists to prevent.
+   *
+   * 📌 AND IT LEAVES A REAL EDGE OPEN, which is named rather than papered over. ADR-0119 lists what
+   * the platform supplies once — fonts, neural voice, vision runtime, art — and the "fonts" there are
+   * the engine's readability ROSTER (ADR-0012). Press Start 2P is not in that roster: it is this
+   * game's LOGO, scoped to the title screen and deliberately kept off the board. So in cartridge form
+   * the title falls back to the platform's own stack until somebody decides where a game-specific
+   * display face belongs. That is a question for the record, not for this file.
+   */
+  publicDir: mode === 'lib' ? false : undefined,
   build: mode === 'lib'
     ? {
         outDir: '../dist-lib',

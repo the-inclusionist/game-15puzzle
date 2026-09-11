@@ -15,7 +15,7 @@
 // symptom would arrive much later: the platform shipping one engine per game, which is the entire
 // arithmetic ADR-0117 exists for.
 
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const OUT = join(import.meta.dirname, '..', 'dist-lib', 'cartridge.js');
@@ -71,6 +71,22 @@ for (const forbidden of ['createGame', 'startLoop']) {
 // And the delivery rule of ADR-0117: a cartridge declares no voice, no font and no heavy runtime.
 for (const forbidden of ['piper-tts-web', 'onnxruntime', 'vlibras', 'huggingface']) {
   if (source.includes(forbidden)) fail(`the cartridge bundle carries a delivery concern: ${forbidden}`);
+}
+
+/**
+ * ⚠️ THE DIRECTORY, NOT ONLY THE BUNDLE — AND THE FIRST DRAFT OF THIS FILE MISSED IT COMPLETELY.
+ *
+ * Everything above reads `cartridge.js`, so a lib build that emitted a perfect 35 kB module and a
+ * copy of `app/public/fonts/` beside it passed with a tick. It did exactly that, until `publicDir`
+ * was turned off for the lib mode. ADR-0117's confirmation asks for this as ABSENCE on the cartridge
+ * side, «or «the platform has it» would pass while every game shipped its own copy anyway» — which is
+ * word for word what happened.
+ */
+const DELIVERY = /\.(woff2?|ttf|otf|eot|wasm|onnx|bin|mp3|ogg|wav|png|jpe?g|webp|svg)$/i;
+const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+  e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]);
+for (const file of walk(join(import.meta.dirname, '..', 'dist-lib'))) {
+  if (DELIVERY.test(file)) fail(`the cartridge directory carries a delivery asset: ${file}`);
 }
 
 const bytes = statSync(OUT).size;
