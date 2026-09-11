@@ -4,8 +4,10 @@
 // ========================= WHY THIS IS A GATE AND NOT A COMMENT =========================
 // The Libras path is made of four pieces that live in three files and never import one another: the
 // engine mounts the bar button and wires it to `toggleLibras` itself; `app/index.html` carries the
-// four attribute hooks the gov.br plugin looks for and the plugin tag; `boot/main.ts` registers
-// `vlibrasSay` into the announcer and ticks the module each frame.
+// four attribute hooks the gov.br plugin looks for and the plugin tag; `boot/standalone.ts` registers
+// `vlibrasSay` into the announcer and ticks the module each frame. ⚠️ THE SHELL AND NOT THE
+// CARTRIDGE: both are statements about the PAGE, so ADR-0139's split puts them on the host's side,
+// and in platform form the platform makes them once for every game instead of each game once.
 //
 // ⚠️ NOTHING FAILS IF ANY ONE OF THEM GOES. Delete the markup and the button still toggles, still
 // says it is on, still persists the choice — and translates nothing. Drop `setVlibrasSay` and every
@@ -40,7 +42,7 @@ const html = readFileSync(join(root, 'app', 'index.html'), 'utf8').replace(/<!--
 const code = (src: string): string =>
   src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-const boot = code(readFileSync(join(root, 'app', 'js', 'boot', 'main.ts'), 'utf8'));
+const boot = code(readFileSync(join(root, 'app', 'js', 'boot', 'standalone.ts'), 'utf8'));
 
 describe('the interpreter has somewhere to mount', () => {
   // The plugin finds its home by ATTRIBUTE, not by class or id, and all four have to be there: it

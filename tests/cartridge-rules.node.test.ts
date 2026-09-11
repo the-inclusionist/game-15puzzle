@@ -51,7 +51,8 @@ const files = walk(SRC).map((path) => ({ path, src: code(readFileSync(path, 'utf
 describe('the rules a standalone build cannot enforce for itself', () => {
   it('is looking at the whole of app/js, including the files at each directory root', () => {
     expect(files.length).toBeGreaterThan(15);
-    expect(files.map((f) => f.path)).toContain(join(SRC, 'boot', 'main.ts'));
+    expect(files.map((f) => f.path)).toContain(join(SRC, 'boot', 'standalone.ts'));
+    expect(files.map((f) => f.path)).toContain(join(SRC, 'cartridge.ts'));
   });
 
   // ADR-0141. The engine exports `createRng`, an independent stream, right beside four helpers bound
@@ -72,8 +73,32 @@ describe('the rules a standalone build cannot enforce for itself', () => {
     expect(own).not.toMatch(/from\s*['"][^'"]*core\/rng/);
   });
 
+  /**
+   * ⚠️ ADR-0139's SECOND GATE, WORD FOR WORD: «grep for `createGame` inside a cartridge's own source
+   * returns nothing». And two more of the same family, because they are the same rule about who owns
+   * the page: `startLoop` (six cartridges each opening a frame callback is six loops fighting over
+   * one frame) and `location` (one address serves every cartridge, so reading the query string reads
+   * another game's parameters — and this game takes `?seed=`).
+   *
+   * The SHELL is exempt and named rather than excluded by pattern: it is the file whose entire job is
+   * to be the page, so a rule that hid it by wildcard would hide the next file that drifted into
+   * doing the same thing.
+   */
+  it('leaves the page to the shell — no createGame, no startLoop, no location', () => {
+    const shell = join(SRC, 'boot', 'standalone.ts');
+    const offenders = files
+      .filter((f) => f.path !== shell)
+      .map(({ path, src }) => ({
+        path,
+        hits: [/createGame/, /startLoop/, /location\s*\.\s*search/]
+          .filter((re) => re.test(src)).map(String),
+      }))
+      .filter((f) => f.hits.length > 0);
+    expect(offenders.map((f) => `${f.path}: ${f.hits.join(' ')}`), 'the page is not theirs').toEqual([]);
+  });
+
   // ADR-0139 / spec D14. Column zero is how this codebase spells module scope: everything inside a
-  // function is indented, and the convention is stated in the first line of boot/main.ts.
+  // function is indented, and the convention is stated in the first line of cartridge.ts.
   it('holds no mutable state at module scope', () => {
     const offenders = files
       .map(({ path, src }) => ({ path, hits: src.match(/^(?:export\s+)?(?:let|var)\s+\w+/gm) ?? [] }))

@@ -9,32 +9,18 @@
 <body>
 
 <!-- MARKUP REQUIRED by createGame: #game-region, #sr-status, #sr-alert. Anything missing does not
-     throw — it lands in engine.problems, which boot/main.ts asserts is empty. -->
+     throw — it lands in engine.problems, which the boot check asserts is empty. -->
 <div id="stage-wrap">
   <div id="game-region" tabindex="-1">
-    <!-- ⚠️ THE WORLD IS THIS ELEMENT, NOT THE REGION, and the distinction is load-bearing rather
-         than tidy. The declaration's `world()` names what the engine may treat as the game, and the
-         engine puts an empathy filter THERE: `blind` is `brightness(0)`, applied to a whole subtree.
-         A CSS filter on an ancestor rasterises everything under it and a descendant CANNOT opt out —
-         `filter: none` on a child is not an escape hatch, it is a no-op. So the panel has to be a
-         SIBLING of the world and not a child of it, or the simulation blacks out the very control
-         that turns the simulation off, and a child is locked inside it.
-         The canvas, the tile grid and the title screen go in here. The panel stays outside. -->
-    <div id="world"></div>
-    <!-- The chrome column: the accessibility bar pinned at the top, the panel scrolling under it.
-         ⚠️ BOTH ARE OUTSIDE #world, and for the same reason the panel already was: the engine puts
-         the empathy filter on the element `world()` names, a CSS filter rasterises its whole subtree,
-         and a descendant cannot opt out. `blind` is brightness(0), and these are the controls that
-         turn `blind` off — inside the world they would go black with everything else. -->
-    <div id="side">
-      <!-- Where the engine mounts its seven accessibility icons. Empty on purpose: `createGame`
-           writes into it, given `host.a11yBarHost`.
-           ⚠️ OUR OWN ID, NEVER #title-icons. That is the platformer's id, and the engine's stylesheet
-           positions it absolute at top:10px;left:50% for the platformer's title art. The 2048
-           measured what that costs elsewhere: the bar landed on top of its HUD and elementFromPoint
-           over the score column started returning a .pi-btn. -->
-      <div id="a11y-bar"></div>
-    </div>
+    <!-- ⚠️ EMPTY ON PURPOSE, AND THAT IS THE CONVERSION. The world, the chrome column, the board
+         and the panel are all created by the CARTRIDGE, inside this element, and removed by its
+         `teardown()`. A page that pre-declared them would be a page a second game inherits.
+
+         What stays here is the one thing `createGame` needs before the cartridge exists: the bar's
+         host. It is inside the region because the engine publishes `--tap` (22·k, so 44 CSS px at
+         the k=2 floor) on the region and nowhere else — see the long note in js/cartridge.ts, and
+         its consequence: this shell must never blanket-empty the region. -->
+    <div id="a11y-bar"></div>
   </div>
 </div>
 
@@ -46,7 +32,7 @@
 <!-- Empty host where installCvdFilters builds the six colour-vision filters at runtime. -->
 <svg id="cvd" class="sr-only" aria-hidden="true"></svg>
 
-<script type="module" src="./js/boot/main.ts"></script>
+<script type="module" src="./js/boot/standalone.ts"></script>
 
 <!-- ============================= LIBRAS, AND IT IS ONLINE-ONLY =============================
      The engine's accessibility bar already mounts a Libras button and already wires it to

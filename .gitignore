@@ -8,3 +8,6 @@ test-results/
 .claude/launch.json
 .vitest-attachments/
 tests/__screenshots__/
+
+# The cartridge build target (ADR-0140). Published from CI, never committed.
+dist-lib/

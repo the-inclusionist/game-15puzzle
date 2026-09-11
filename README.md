@@ -40,7 +40,7 @@ Two consequences worth stating, because both were nearly designed wrong:
 ## Running it
 
 ```
-npm install          # the engine comes from npmjs, pinned exact
+npm install          # the engine is a peer AND a devDependency - see docs/LICENSES.md
 npm run dev
 npm run validate     # typecheck + vitest (node & browser) + build — all three must be clean
 ```
@@ -63,8 +63,32 @@ app/js/declaration/   the seven declared fields (ADR-0027), said in sliding tile
 app/js/render/        geometry, palette, slide, board-view — PixiJS-free, through render/port.ts.
 app/js/ui/            the tile grid and the HUD. DOM.
 app/js/i18n/          pt (base), en, es — registered into the engine's own t().
-app/js/boot/main.ts   the composition root, and with render/surface.ts the only file naming PixiJS.
+app/js/cartridge.ts   THE CARTRIDGE: `createCartridge()` -> declaration, hooks, dicts, create(ctx).
+                      Calls no createGame, opens no loop, reads no address, does nothing on import.
+app/js/boot/standalone.ts  the app SHELL: createGame, the ctx, the clock, the voice, Libras, Vlibras.
 ```
+
+## Two artifacts, one source
+
+`npm run build` produces the **standalone PWA** — `app/index.html`, engine and Pixi bundled, and the
+route a developer, a reviewer or an accessibility audit actually opens. `npm run build:lib` produces
+the **cartridge**: `dist-lib/cartridge.js`, 35 kB, with the engine and Pixi left external so a
+platform installs exactly one copy of each for every game it carries (ADR-0139, ADR-0140).
+
+⚠️ **The standalone build is a development, audit and demonstration route — never a delivery route to
+a child.** The moment one is deployed for children, every word of ADR-0117 applies: Cache Storage
+partitions by origin, the accessibility profile stops following the child between games, and a school
+network has a second address to allow.
+
+`npm run validate` builds both, because a change tested only in the app build can break the lib build
+and nothing notices until a platform installs it.
+
+⚠️ **And `engine.problems` is no longer empty**, with exactly one line: the engine resolves the
+declaration's `world()` selector at boot, and `#world` is created by the cartridge afterwards. The
+effect is diagnostic only — the vision filter resolves the selector at the point of use, and the boot
+protocol measures it landing on the board while sparing the bar and the panel. The shell names that
+one line and throws on any other. It is evidence for ADR-0142, which gives the engine a `mount()` for
+exactly this and is accepted but not built.
 
 There is no `adr/` directory and there never will be one: the records live in the engine, where the
 validator and the supersession graph already are (ADR-0068 §5). Game-local reasoning lives in file

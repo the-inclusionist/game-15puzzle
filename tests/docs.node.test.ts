@@ -23,14 +23,19 @@ import { describe, expect, it } from 'vitest';
 
 const root = join(import.meta.dirname, '..');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
-  dependencies: Record<string, string>;
+  peerDependencies: Record<string, string>;
   devDependencies: Record<string, string>;
 };
 
 // `^4.0.0` and `4.0.0` are the same claim as far as a sentence is concerned; the range operator is a
 // resolution detail and nobody writes it in prose.
+// ⚠️ `dependencies` IS GONE AND THAT IS THE POINT. The cartridge conversion moved the engine and
+// Pixi to `peerDependencies` — so a platform installs exactly ONE copy — and kept them in
+// `devDependencies` so a clean clone still builds (ADR-0140 §4). Reading only `dependencies` here
+// made this gate throw the moment that landed, which is the gate doing its job in the rudest
+// possible way: it noticed the manifest had changed shape.
 const declared = new Set(
-  [...Object.values(pkg.dependencies), ...Object.values(pkg.devDependencies)]
+  [...Object.values(pkg.peerDependencies), ...Object.values(pkg.devDependencies)]
     .map((range) => range.replace(/^[\^~>=<\s]+/, '')),
 );
 
@@ -53,8 +58,10 @@ describe('the documents name only versions this repository installs', () => {
   // The other half, and it is the one the upgrade actually needed: the engine is the single most
   // important version in this repository, and both documents are supposed to say which one.
   it('both documents name the engine version that is installed', () => {
-    const engine = pkg.dependencies['@the-inclusionist/engine'];
-    expect(engine, 'the engine is not in dependencies at all').toBeTruthy();
+    // The DEV range is the one that says which engine is installed here; the peer range is a
+    // requirement addressed to a consumer and is deliberately wider.
+    const engine = pkg.devDependencies['@the-inclusionist/engine'];
+    expect(engine, 'the engine is not in devDependencies at all').toBeTruthy();
     for (const doc of DOCS) {
       expect(readFileSync(join(root, doc), 'utf8'), `${doc} does not name engine ${engine}`)
         .toContain(engine);

@@ -40,6 +40,11 @@ export function createSurface(): Surface {
   PIXI.settings.ROUND_PIXELS = true;
 
   const app = new PIXI.Application({
+    // ⚠️ NO SECOND CLOCK. The loop belongs to the shell (ADR-0139 §3) and this game renders
+    // explicitly, from `update(dt)`. Left on, the application would start its own ticker and render
+    // beside the one the shell drives — two clocks for one 320x180 surface, on hardware pillar 1
+    // describes as weak.
+    autoStart: false,
     width: LOGICAL_W,
     height: LOGICAL_H,
     backgroundAlpha: 0,
