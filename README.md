@@ -78,24 +78,58 @@ ADR-0068 §4, and ADR-0067 §5 is why it lives there rather than in a `.github` 
 record declares. It runs with `a11y: true`, which is not a default: the input exists so that skipping
 pillar 2 is a visible line rather than an absence.
 
-The engine comes from **public npmjs**, pinned exact at `7.0.1` (ADR-0072), so the gate has
+The engine comes from **public npmjs**, pinned exact at `8.0.0` (ADR-0072), so the gate has
 everything it needs: `npm ci` resolves from the registry and there is no sibling directory to be
 missing. That was the last thing standing between this repository and a green pipeline.
 
 To develop against a local engine checkout: `npm install ../SP-the-inclusionist-tracer`, which is
 ADR-0036's loop — link locally, pin remotely — and revert before committing.
 
-## No neural voice, on purpose
+## Neural voice, and the argument that used to be here
 
-The engine takes the neural text-to-speech engine as a **port** (ADR-0094): a game passes
-`carregarVozNeural` if it wants one. This game does not, so narration goes through Web Speech —
-which speaks the right language, works offline and weighs nothing — and the audio panel stops
-*offering* an engine it could not load, rather than offering one that never arrives.
+This section used to be called *"No neural voice, on purpose"* and made the case for declining. The
+case was wrong, and it is worth keeping the reason visible rather than quietly swapping the
+conclusion: it ended on the sentence *"a game whose entire spoken content is «tile 7 to the left»"*,
+which measured the wrong thing. **The voices are not game content.** They are narration — the
+resource of a child who cannot read, for whatever reason — and a sliding puzzle is precisely a game
+such a child can play, if it is read to her well. Weighing them against how much this game has to
+say was the error.
 
-The trade is measured, not assumed. Passing the port would put **27 MB of WASM** in the build and
-**135 MB** in every `node_modules` (`onnxruntime-web` is a non-optional peer of the provider), for a
-game whose entire spoken content is "tile 7 to the left". ADR-0058 targets under 30 MB for a school
-download; **this game's whole `dist/` is 640 KB in seven files.**
+So the port is passed. The engine takes the neural text-to-speech engine as a **port** (ADR-0094)
+because `onnxruntime-web` is a *non-optional* peer of the provider: naming it inside the engine would
+put 135 MB in the `node_modules` of every consumer, including games that never speak. A game that
+wants a voice names the provider itself, in one line; a game that stays silent keeps Web Speech.
+
+The price, and both numbers, because either one alone misleads:
+
+| | on disk | over the wire |
+|---|---|---|
+| `ort-wasm-simd-threaded.jsep.wasm` | 27,797 kB | 6,651 kB |
+| the ONNX runtime, piper and the voice catalogue | 604 kB | 164 kB |
+| everything else — the game, the stylesheet, the font | 636 kB | 195 kB |
+
+**And this is the standalone build, which is why that is acceptable.** ADR-0140 makes the standalone
+artifact a development, audit and demonstration route and **never a delivery route to a child**, so
+ADR-0058's 30 MB school-download ceiling is not a measurement of this. In cartridge form the weight
+is not here at all: `carregarVozNeural` is the *host's* half of `CreateGameOptions` (ADR-0139), so
+the import leaves with the shell and the platform pays it once for every cartridge (ADR-0117).
+
+The download is asked for separately and **filtered**: `baixarPesados({ apenas })` for `voz:*` only,
+derived from the engine's catalogue rather than hand-written. The blanket default would also fetch
+34 MB of MediaPipe vision models and WebGazer, which nothing here uses.
+
+## Libras
+
+The accessibility bar's 🤟 button toggles a real, persisted mode, and the gov.br VLibras plugin is
+mounted so that it has something to translate with — every announcement this game makes reaches the
+interpreter as well as the live region.
+
+⚠️ **It is the only third-party, network-required thing on the page.** Everything else, including the
+typeface, is in the build. The engine's own note explains why it is interim: the interpreter is meant
+to appear in front of the screen while audio plays and leave afterwards, with nothing to click, and
+the gov.br widget is a docked panel that translates the text of an element you click. ADR-0010's
+pillar 2 plans an interpreter of our own. Until then, a button that toggles a mode and translates
+nothing is the half-truth worth removing.
 
 ## Credits and licences
 

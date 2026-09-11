@@ -94,14 +94,30 @@ statement and does **not** inherit the AGPL.
 
 | Component | Licence | Note |
 |---|---|---|
-| `@the-inclusionist/engine` | AGPL-3.0-or-later | Same owner. From public npmjs, pinned exact at 7.0.1 (ADR-0072); this repository is its second external consumer after `game-chess`. |
-
-⚠️ **No neural voice ships with this game**, so no third-party speech engine appears above. The
-engine offers it as a port (ADR-0094) and this game declines: narration is Web Speech, which is the
-browser's own. See the note in `package.json` for the measurement behind that.
+| `@the-inclusionist/engine` | AGPL-3.0-or-later | Same owner. From public npmjs, pinned exact at **8.0.0** (ADR-0072); this repository is its second external consumer after `game-chess`. Its stylesheet is pulled in by `@import` at the top of `app/css/style.css` and ships inside this build. |
+| `@mintplex-labs/piper-tts-web` 1.0.4 | **MIT** | The neural voice provider, named here because the engine takes it as a port and cannot name it itself (ADR-0094). |
+| `onnxruntime-web` | **MIT** | Not declared by this repository and not optional: it is a hard peer of the provider above, and it is what the 27,797 kB `ort-wasm-simd-threaded.jsep.wasm` in `dist/` is. |
 | PixiJS 7.4.2 | MIT | Pinned to the engine's **exact** version — a second PixiJS in one page is a bug, not a fallback. |
 | Vite, Vitest, Playwright, TypeScript | MIT / Apache-2.0 | Development only; none ships. |
 | **Press Start 2P** by CodeMan38 | **SIL OFL 1.1** | The title screen's typeface, and only the title screen's — see below. Vendored at `app/public/fonts/`, with `press-start-2p.OFL.txt` beside it. |
+| **VLibras** (`vlibras.gov.br`) | *not asserted — see below* | The Libras interpreter. **Loaded from the government's address at runtime and never vendored**, so this repository redistributes none of it and takes no position on its terms. It is the only third-party, network-required component on the page. |
+
+⚠️ **THE VOICE SECTION HERE USED TO SAY THE OPPOSITE**, and it is replaced rather than edited,
+because it argued a case: *"No neural voice ships with this game… this game declines: narration is
+Web Speech."* That was true until the decision changed. The reasoning that overturned it is in the
+README — the voices are narration for a child who cannot read, not game content, so measuring them
+against how much this game says was measuring the wrong thing.
+
+⚠️ **And the paragraph it replaced sat INSIDE the table**, between two rows, which silently ended the
+table at that point: everything from PixiJS down rendered as plain text in any Markdown viewer. Both
+are fixed here.
+
+**What ships and what does not**, because the distinction is about to matter: `piper-tts-web` and the
+ONNX runtime are in **this** build, which ADR-0140 defines as a development, audit and demonstration
+artifact and never a delivery route to a child. In cartridge form `carregarVozNeural` is the host's
+half of `CreateGameOptions` (ADR-0139), so neither appears in the published module and the platform
+carries them once for every cartridge (ADR-0117). The same line divides VLibras: the markup and the
+script tag live in `app/index.html`, which is the standalone shell.
 
 ### The upstream this game remakes
 
