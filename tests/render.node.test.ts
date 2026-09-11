@@ -215,12 +215,52 @@ describe('slide — one clock, whole pixels', () => {
     let reduced = true;
     const s = createSlide({ frames: 8, reduced: () => reduced });
     s.begin([move], 4, 39);
-    expect(s.travelling()).toEqual([{ tile: 5, at: 5, dx: 0, dy: 0 }]);
+    // ⚠️ THIS LINE USED TO EXPECT `[{ tile: 5, at: 5, dx: 0, dy: 0 }]`, AND THAT WAS THE DEFECT
+    // WRITTEN DOWN AS A PROPERTY. A tile parked at displacement zero is not a shorter journey, it is
+    // no journey — and the object that described it was the same non-empty `push` that kept
+    // `active()` true for ever, so the board refused every press after the first. Under reduced
+    // motion there is nothing travelling, and `[]` is what that is called.
+    expect(s.travelling()).toEqual([]);
+    expect(s.active()).toBe(false);
     expect(s.advance(1)).toBe(false);
 
+    // And the property this test was always here to guard: the switch is read at each `begin`, not
+    // captured once at construction.
     reduced = false;
     s.begin([move], 4, 39);
     expect(s.travelling()[0].dx).toBe(39);
+  });
+
+  /**
+   * ⚠️ THE BUG THIS PINS COST A CHILD THE WHOLE GAME, AND EVERY GREEN RUN MISSED IT.
+   *
+   * `begin` set `t = 1` under reduced motion but left `push` full, and `advance` returned at its
+   * `t >= 1` guard WITHOUT clearing it. So `active()` stayed true for ever, and the composition root
+   * refuses input while a slide is active: one press, then a dead board.
+   *
+   * It was invisible because every verification ran with motion ON. It surfaced the moment the
+   * accessibility bar was mounted and its calm icon was pressed — which is the whole argument for
+   * mounting the bar, arriving early.
+   *
+   * The invariant, stated so it cannot rot: `active()` is true exactly while something still has to
+   * move, and under reduced motion nothing does.
+   */
+  it('is never left ACTIVE under reduced motion — one press must not kill the board', () => {
+    const s = createSlide({ frames: 8, reduced: () => true });
+    s.begin([move], 4, 39);
+    expect(s.active(), 'a finished slide is not an active one').toBe(false);
+    expect(s.travelling()).toEqual([]);
+    // And a second press must be possible, which is the symptom a player would report.
+    s.begin([move], 4, 39);
+    expect(s.active()).toBe(false);
+  });
+
+  it('clears itself when a full-frame step finishes it, not only when it eases out', () => {
+    const s = createSlide({ frames: 8 });
+    s.begin([move], 4, 39);
+    expect(s.active()).toBe(true);
+    s.advance(99);
+    expect(s.active()).toBe(false);
   });
 
   it('takes dt in FRAMES, so a bigger step finishes sooner', () => {

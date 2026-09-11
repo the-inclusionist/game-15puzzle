@@ -102,16 +102,26 @@ export function createSlide(o: SlideOptions = {}): Slide {
 
   return {
     begin(next, boardSize, cellStep) {
-      push = next; size = boardSize; step = cellStep;
-      // Reduced motion is ONE branch: the slide is constructed already finished, so the tile
-      // teleports and the whole path collapses into the same code. No media query, which is the
-      // only way the system preference and the in-game switch can agree.
-      t = reduced() ? 1 : 0;
+      size = boardSize; step = cellStep;
+      // Reduced motion is ONE branch, and the branch is "there is nothing to animate". No media
+      // query, which is the only way the system preference and the in-game switch can agree.
+      //
+      // ⚠️ IT MUST EMPTY `push`, NOT MERELY FINISH THE CLOCK. This set `t = 1` and kept the push,
+      // and `advance` then returned at its own `t >= 1` guard without clearing it — so `active()`
+      // stayed true for ever and the composition root, which refuses input while a slide is active,
+      // refused every press after the first. A child with reduced motion could make ONE move and the
+      // board went dead. Every verification run had motion on, so every one of them was green.
+      if (reduced()) { push = []; t = 1; return; }
+      push = next;
+      t = 0;
     },
 
     advance(dt) {
-      if (push.length === 0 || t >= 1) return false;
+      if (push.length === 0) return false;
       t = Math.min(1, t + dt / frames);
+      // ⚠️ ONE EXIT, AND IT ALWAYS CLEARS. The invariant the bug above broke: `active()` is true
+      // exactly while something still has to move. A guard that returned early on `t >= 1` without
+      // emptying the push was a second way to be finished, and only one of the two said so.
       if (t >= 1) { push = []; return false; }
       return true;
     },
