@@ -35,7 +35,13 @@
 import { chromium } from 'playwright';
 import { AxeBuilder } from '@axe-core/playwright';
 
-const URL = process.env.AXE_URL || 'http://localhost:4173/';
+const BASE = process.env.AXE_URL || 'http://localhost:4173/';
+/**
+ * ⚠️ `?debug=true` IS ADDED HERE AND NOT ASKED OF THE CALLER. The scan needs the game's verification
+ * surface to reach the high-contrast theme by name, and a caller who forgot the parameter would get a
+ * run that scanned the normal palette twice and reported success — the worst kind of green.
+ */
+const URL = BASE + (BASE.includes('?') ? '&' : '?') + 'debug=true';
 
 /**
  * Every board size is scanned, because they are not the same page: the number of cells, the digit
@@ -105,7 +111,18 @@ try {
     );
 
     for (const contrast of [false, true]) {
-      await page.setChecked('#hud-contrast', contrast);
+      // ⚠️ THE HIGH-CONTRAST THEME IS THE ENGINE'S NOW, so it is set where the engine keeps it rather
+      // than through a checkbox this game no longer owns. Driving the bar's 🌗 icon here would make
+      // the scan depend on how many times it has to be pressed to reach a given level, which is the
+      // engine's business and would silently rot when the engine changes it.
+      // No optional chaining: a missing surface must stop the run, not quietly scan the same palette
+      // twice. This is the second half of the `?debug=true` note above.
+      await page.evaluate((on) => {
+        if (typeof window.__puzzle?.setTema !== 'function') {
+          throw new Error('__puzzle.setTema is missing: the scan cannot reach the high-contrast theme');
+        }
+        window.__puzzle.setTema(on ? 'hc7' : 'padrao');
+      }, contrast);
       const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
         .analyze();

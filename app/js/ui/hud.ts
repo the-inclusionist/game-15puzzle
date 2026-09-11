@@ -28,7 +28,7 @@
 // GPL (ADR-0064), and neither the engine nor the chess consumer ships it today. `agpl-source-offer`
 // is the gate that keeps it here.
 
-import { VIZ_DOM_ONLY, VIZ_FILTER } from '@the-inclusionist/engine/render/viz-modes.js';
+import { VIZ_FILTER } from '@the-inclusionist/engine/render/viz-modes.js';
 import { SIZES } from '../render/geometry.ts';
 import type { Size } from '../render/geometry.ts';
 import type { I18n } from '../i18n/index.ts';
@@ -50,11 +50,9 @@ export interface HudDeps {
   onShuffle(): void;
   onHint(): void;
   onSize(size: Size): void;
-  onContrast(high: boolean): void;
-  onVision(key: string): void;
   onReducedMotion(on: boolean): void;
   /** The starting states, so the controls open showing what is actually true. */
-  readonly initial: { size: Size; contrast: boolean; vision: string; reducedMotion: boolean };
+  readonly initial: { size: Size; reducedMotion: boolean };
 }
 
 export interface Hud {
@@ -101,37 +99,23 @@ export function createHud(deps: HudDeps): Hud {
   sizeSelect.value = String(deps.initial.size);
   sizeSelect.addEventListener('change', () => deps.onSize(Number(sizeSelect.value) as Size));
 
-  const visionLabel = el('label');
-  const visionSelect = el('select');
-  visionSelect.id = 'hud-vision';
-  visionLabel.htmlFor = visionSelect.id;
-  // Derived from the engine's catalogue, never listed by hand: `VIZ_DOM_ONLY` is exactly the modes
-  // that apply as a CSS filter over an element, so a mode added there arrives here for free and a
-  // mode that needs a repainted texture never appears in a menu that could not honour it.
-  for (const mode of VIZ_DOM_ONLY) {
-    // ⚠️ A MODE WITH NO FILTER IS A MENU ENTRY THAT DOES NOTHING. `VIZ_DOM_ONLY` is derived from the
-    // catalogue's `kind`, and not every entry there resolves to a CSS filter string — so listing the
-    // set wholesale would offer a child a setting that changes nothing when she picks it, which is
-    // worse than not offering it. Found by hud.browser: the option rendered, and `visionFilter`
-    // returned ''.
-    if (mode.key !== 'normal' && !VIZ_FILTER[mode.key]) continue;
-    const option = doc.createElement('option');
-    option.value = mode.key;
-    option.dataset.i18nKey = mode.nome;
-    visionSelect.appendChild(option);
-  }
-  visionSelect.value = deps.initial.vision;
-  visionSelect.addEventListener('change', () => deps.onVision(visionSelect.value));
-
-  const contrastRow = el('span', 'hud-check');
-  const contrastBox = el('input');
-  contrastBox.type = 'checkbox';
-  contrastBox.id = 'hud-contrast';
-  contrastBox.checked = deps.initial.contrast;
-  const contrastText = el('label');
-  contrastText.htmlFor = contrastBox.id;
-  contrastBox.addEventListener('change', () => deps.onContrast(contrastBox.checked));
-  contrastRow.append(contrastBox, contrastText);
+  /* ===================== WHAT USED TO BE HERE, AND WHY IT IS NOT =====================
+   *
+   * A vision `<select>` and a high-contrast checkbox lived at this point. They were removed on the
+   * engine 9.0.0 upgrade in favour of the accessibility bar's 🚥 and 🌗 — the Dev's priority, in his
+   * words: use the engine's menus, icons and themes, so the project keeps one visual identity.
+   *
+   * ⚠️ AND KEEPING BOTH WOULD HAVE BEEN WORSE THAN DUPLICATION. These wrote this game's own storage
+   * keys while the bar writes the engine's, so the two would disagree the moment a child touched
+   * either. This game already carries one such split — the TEA icon against the motion checkbox —
+   * and that one is survivable only because an OR can never un-reduce motion. Contrast has no safe
+   * direction to fall in.
+   *
+   * 📌 The select was also ONE field carrying two axes plus the simulations, which is the shape
+   * ADR-0104 split and ADR-0011's supersession forbids: a child with colour blindness may need high
+   * contrast AT THE SAME TIME, and one value cannot hold both. `setTemaDoJogador` and
+   * `setCorrecaoDoJogador` are two fields because they are two questions.
+   */
 
   const motionRow = el('span', 'hud-check');
   const motionBox = el('input');
@@ -155,8 +139,7 @@ export function createHud(deps: HudDeps): Hud {
     movesTitle, movesValue, progress,
     shuffle, hintButton,
     sizeLabel, sizeSelect,
-    visionLabel, visionSelect,
-    contrastRow, motionRow,
+    motionRow,
     el('span', 'hud-spacer'),
     legal,
   );
@@ -176,12 +159,6 @@ export function createHud(deps: HudDeps): Hud {
     hintButton.setAttribute('aria-label', i18n.t('hud.hint'));
     sizeLabel.textContent = i18n.t('hud.size');
     for (const option of Array.from(sizeSelect.options)) option.textContent = i18n.t(`size.${option.value}`);
-    visionLabel.textContent = i18n.t('hud.vision');
-    for (const option of Array.from(visionSelect.options)) {
-      const key = option.dataset.i18nKey;
-      if (key) option.textContent = i18n.t(key);
-    }
-    contrastText.textContent = i18n.t('hud.highContrast');
     motionText.textContent = i18n.t('hud.reducedMotion');
     legalText.textContent = i18n.t('legal.licence');
     sourceLink.textContent = i18n.t('legal.source');

@@ -34,12 +34,10 @@ function mount() {
     doc: document,
     i18n,
     run: () => run,
-    initial: { size: 4, contrast: false, vision: 'normal', reducedMotion: false },
+    initial: { size: 4, reducedMotion: false },
     onShuffle: () => calls.push('shuffle'),
     onHint: () => calls.push('hint'),
     onSize: (n: Size) => calls.push(`size:${n}`),
-    onContrast: (on) => calls.push(`contrast:${on}`),
-    onVision: (k) => calls.push(`vision:${k}`),
     onReducedMotion: (on) => calls.push(`motion:${on}`),
   });
   region.appendChild(hud.root);
@@ -139,16 +137,27 @@ describe('the controls', () => {
     }
   });
 
-  it('lists only vision modes that a CSS filter can actually deliver', () => {
-    const m = mount();
-    const options = [...m.hud.root.querySelectorAll<HTMLOptionElement>('#hud-vision option')];
-    expect(options.length).toBeGreaterThan(3);
-    for (const option of options) {
-      expect(option.textContent?.trim(), option.value).not.toBe('');
-      // Derived from the engine's own catalogue, so a mode that needed a repainted texture could
-      // never reach a menu that has no way to honour it.
-      if (option.value !== 'normal') expect(visionFilter(option.value)).not.toBe('');
-    }
+  /**
+   * ⚠️ THE TEST THAT USED TO BE HERE IS RETIRED, NOT MOVED, and the difference is worth the words.
+   *
+   * It read: «lists only vision modes that a CSS filter can actually deliver», and it guarded a real
+   * defect — `VIZ_DOM_ONLY` includes entries that resolve to no filter, so listing the set wholesale
+   * offered a child a setting that changed nothing when she picked it. That menu no longer exists:
+   * on engine 9.0.0 the accessibility bar's 🚥 and 🌗 own colour correction and contrast, because the
+   * Dev's priority is that every game in the catalogue uses the engine's menus, icons and themes.
+   *
+   * There is nothing left here to assert. The property it protected now belongs to the engine's own
+   * menu, and a copy of it in this repository would be a gate measuring somebody else's widget —
+   * green or red for reasons no one here can act on.
+   *
+   * `visionFilter` itself survives and is still exercised: the cartridge maps the engine's
+   * `Correcao` axis onto it, and `hud.ts` keeps it as the one place a filter key becomes CSS.
+   */
+  it('still turns a correction key into a filter, which is what the cartridge asks of it', () => {
+    expect(visionFilter('fix-deuter')).not.toBe('');
+    // `tricro` is a NAME for trichromatic vision, not an absence, and it is the one correction that
+    // must resolve to nothing — the cartridge maps it to `normal` before asking.
+    expect(visionFilter('normal')).toBe('');
   });
 
   it('rebuilds its own text when the language changes', () => {

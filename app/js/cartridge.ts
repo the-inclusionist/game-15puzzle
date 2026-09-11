@@ -34,7 +34,8 @@ import { createTitleScreen } from './ui/title-screen.ts';
 import { srAlert, srSay } from '@the-inclusionist/engine/core/a11y-sr.js';
 import * as store from '@the-inclusionist/engine/platform/storage.js';
 import { lerCenaGuardada } from '@the-inclusionist/engine/ui/motion-scene.js';
-import { alcanceDoModo } from '@the-inclusionist/engine/render/viz-setters.js';
+import { alcanceDoModo, lerVisualGuardado } from '@the-inclusionist/engine/render/viz-setters.js';
+import { PADRAO } from '@the-inclusionist/engine/render/viz-axes.js';
 
 import type { Size } from './render/geometry.ts';
 import type { Run } from './puzzle/run.ts';
@@ -43,6 +44,7 @@ import type { GameDeclaration } from '@the-inclusionist/engine/core/contract.js'
 // ⚠️ THE BARE SPECIFIER, not a `boot/…` subpath: the engine's export map routes `.` to
 // `dist-pkg/boot/create-game` and publishes no `./boot/*` pattern at all.
 import type { GanchosDoCartucho } from '@the-inclusionist/engine';
+import type { VisualState } from '@the-inclusionist/engine/render/viz-axes.js';
 
 /** This game's own generator, never the engine's shared stream — ADR-0141, and `puzzle/rng.ts` for why. */
 export interface Rng {
@@ -135,6 +137,7 @@ export type CartridgeHooks = GanchosDoCartucho;
  *  depend on the whole `Engine` shape while the contract is still moving. */
 interface EngineLike {
   readonly problems: readonly string[];
+  readonly pausa: { mostrar(i: number): void; esconder(i: number): void };
   readonly keyboard: { actionOf(code: string, player: number): string | null };
   readonly cenas: {
     push(s: unknown): void; replace(s: unknown): void; pop(): void;
@@ -168,6 +171,29 @@ const key = (name: string): string => store.kJogo('15puzzle', name);
 export function createCartridge(): Cartridge {
   // The pointer the declaration forwards through. Function scope, not module scope.
   let run: Run | null = null;
+
+  /**
+   * THE CHILD'S VISUAL STATE, AND THE ENGINE IS ITS OWNER NOW.
+   *
+   * ⚠️ THIS IS THE «MENUS, ICONS AND THEMES OF THE ENGINE» DECISION, IN ONE POINTER. Until 9.0.0 this
+   * game kept its own contrast checkbox and its own vision select, writing `incl.15puzzle.contrast`
+   * and `.vision`. It did that because the engine mounted neither icon — and the engine's own note
+   * about that absence names the mistake exactly: «o consumidor externo leu a ausência como «este
+   * jogo tem os seus próprios controles», o que é verdade sobre o resultado e falso sobre a causa».
+   * There was no door. There is one now, and walking through it is what keeps every game in the
+   * catalogue looking and behaving like the same product.
+   *
+   * 📌 TWO AXES AND NOT ONE STRING, which is ADR-0104 and the reason ADR-0011's exclusivity clause was
+   * superseded: a child with colour blindness may need high contrast AT THE SAME TIME, and one field
+   * holding one value makes the two cancel each other. The old select had exactly that defect.
+   *
+   * ⚠️ It lives in the FACTORY's closure and not in `create`, because it is the CHILD's and not the
+   * game's: ADR-0038 puts the profile at PAGE lifetime, so it has to survive a mount/unmount cycle.
+   * `run` above is the opposite case and that is why they are two pointers rather than one object.
+   */
+  let visual: VisualState = PADRAO;
+  let repaint: ((v: VisualState) => void) | null = null;
+  let pauseActs: Record<string, (() => void) | undefined> = {};
 
   const savedSize = Number(store.get(key('size'), '4'));
   const startSize: Size = (SIZES as readonly number[]).includes(savedSize) ? (savedSize as Size) : 4;
@@ -207,6 +233,32 @@ export function createCartridge(): Cartridge {
       // null — and `semMenuDePausa` no longer exists at all: ADR-0120 made the pause undeclinable.
       declines: { semAssistenteDePad: true, semAtorDePausa: true },
       isNavigable: () => true,
+
+      /**
+       * ⚠️ PASSING THESE IS WHAT MOUNTS 🌗 AND 🚥. `iconesQueAccionam` only builds an icon that has
+       * somebody to action it, and that rule is right — an icon that does nothing teaches a child
+       * that the adjustment she depends on is broken. The engine owns the VALUE and persists it; the
+       * game owns the EFFECT, which is ADR-0106's division and is why these are two lines here and a
+       * repaint below rather than a settings screen of our own.
+       *
+       * The player index is ignored: this game seats one.
+       */
+      setTemaDoJogador: (_i, tema) => { visual = { ...visual, tema }; repaint?.(visual); },
+      setCorrecaoDoJogador: (_i, correcao) => { visual = { ...visual, correcao }; repaint?.(visual); },
+
+      /**
+       * ⚠️ AND THIS ONE IS NOT A FEATURE, IT IS A DEFECT BEING CLOSED. Without a table, `acts.resume`
+       * is `undefined` — and `entrarNaBarra` calls it to leave the pause card before handing the
+       * directional to the accessibility bar. So the card stayed on top of the game and item 7 of
+       * ADR-0044, the directional driving the bar, was UNREACHABLE from any game `createGame` mounted.
+       * The whole catalogue had it.
+       *
+       * 📌 A FUNCTION and not a value, which the engine's own note asks for: a game's action table
+       * changes during play, and `refrescarItensDaPausa` exists precisely because «a tabela de acções
+       * deste jogo pode ter mudado desde a montagem». Frozen at boot it would describe the cartridge
+       * that started first.
+       */
+      getPauseActs: () => pauseActs,
       // The sonar needs to know where the listener stands. On a grid that is the cursor's square, so
       // the engine can measure to the targets the declaration hands it. It forwards through the same
       // pointer the declaration does, so before `create` it describes the placeholder and after
@@ -236,8 +288,12 @@ export function createCartridge(): Cartridge {
       // not an arrow: what a player needs to know is WHICH TILES she is about to shift.
       let hint: readonly number[] = [];
 
-      let highContrast = store.getBool(key('contrast'), false);
-      let vision = store.get(key('vision'), 'normal');
+      // ⚠️ READ FROM THE ENGINE, NOT FROM THIS GAME'S OWN KEYS. `lerVisualGuardado` also MIGRATES a
+      // profile saved before the two axes existed, which is the difference between migrating a child's
+      // setting and silently resetting it — and whoever chose `fix-deuter` chose it because she sees
+      // that way.
+      visual = lerVisualGuardado(0);
+      let highContrast = visual.tema !== 'padrao';
       const systemReduced = win.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
       let reducedMotion = store.getBool(key('motion'), systemReduced);
 
@@ -256,6 +312,25 @@ export function createCartridge(): Cartridge {
        * asked for it whole.
        */
       const motionReduced = (): boolean => reducedMotion || lerCenaGuardada().items === true;
+
+      // The engine writes the value and calls this; the game repaints. ADR-0106's division, and the
+      // reason the cartridge needs no settings screen of its own for either axis.
+      repaint = (v) => { highContrast = v.tema !== 'padrao'; applyLook(); };
+
+      /**
+       * THE PAUSE TABLE, AND IT IS SHORT ON PURPOSE.
+       *
+       * `resume` is the one that is not optional: `entrarNaBarra` calls `acts.resume?.()` to leave the
+       * card before handing the directional to the accessibility bar, so an absent table left the card
+       * on top of the game and made item 7 of ADR-0044 unreachable from any game `createGame` mounted.
+       *
+       * ⚠️ AND NOTHING ELSE IS LISTED, WHICH IS THE RULE WORKING RATHER THAN AN OVERSIGHT. A 15-puzzle
+       * has nowhere to quit TO, no help screen and nothing to print; `itensQueAccionam` hides what a
+       * game cannot action, because «um item sem acção é um botão morto, e em silêncio» — a child who
+       * presses it gets no error, no announcement and nothing at all, and a screen reader has just read
+       * her an item that does not exist.
+       */
+      pauseActs = { resume: () => engine.pausa.esconder(0) };
 
       /* ===================== THE TWO BOXES THIS GAME NEEDS, BOTH ITS OWN =====================
        *
@@ -328,12 +403,10 @@ export function createCartridge(): Cartridge {
         doc,
         i18n,
         run: () => run as Run,
-        initial: { size, contrast: highContrast, vision, reducedMotion },
+        initial: { size, reducedMotion },
         onShuffle: () => newRun(size, Date.now() >>> 0, 'a11y.shuffled'),
         onHint: () => showHint(),
         onSize: (next) => { store.set(key('size'), next); newRun(next, Date.now() >>> 0, 'a11y.sizeChanged'); },
-        onContrast: (on) => { highContrast = on; store.setBool(key('contrast'), on); applyLook(); },
-        onVision: (next) => { vision = next; store.set(key('vision'), next); applyLook(); },
         onReducedMotion: (on) => { reducedMotion = on; store.setBool(key('motion'), on); },
       });
       side.appendChild(hud.root);
@@ -381,9 +454,17 @@ export function createCartridge(): Cartridge {
         region.style.setProperty('--accent', palette.accent);
         region.style.setProperty('--title-bg', palette.backdrop);
         region.style.setProperty('--title-ink', palette.tileAway);
-        // The vision filter is the engine's job: the game declares which element is the world and
-        // `aplicarFiltroDeVisao` puts the filter there, so the reach rule lives in one place.
-        engine.aplicarFiltroDeVisao(visionFilter(vision), alcanceDoModo(vision));
+        /**
+         * THE FILTER COMES FROM THE ENGINE'S AXES NOW, and the mapping is three lines because the
+         * vocabulary is the engine's: `tricro` is a NAME for trichromatic vision and not an absence,
+         * so it is the one correction that resolves to no filter at all.
+         *
+         * The game declares which element is the world and `aplicarFiltroDeVisao` puts the filter
+         * there, so the reach rule stays in one place — and `#world` is a filter boundary precisely so
+         * the panel and the borrowed bar stay legible under a simulation.
+         */
+        const mode = visual.correcao === 'tricro' ? 'normal' : `fix-${visual.correcao}`;
+        engine.aplicarFiltroDeVisao(visionFilter(mode), alcanceDoModo(mode));
       }
 
       function newRun(next: Size, nextSeed: number, announcement: string): void {
@@ -481,6 +562,12 @@ export function createCartridge(): Cartridge {
         teardown(): void {
           stopI18n();
           slide.cancel();
+          // ⚠️ THE POINTERS GO FIRST. Both are read by the engine through the cartridge's hooks, which
+          // outlive this instance: a `setTemaDoJogador` arriving after teardown would repaint a board
+          // that no longer exists, and a pause item would call into a torn-down closure. The visual
+          // STATE stays — it is the child's, not the game's (ADR-0038).
+          repaint = null;
+          pauseActs = {};
           // ⚠️ THE BORROWED BAR GOES BACK FIRST, before anything is removed. It is the host's, it
           // outlives this cartridge, and it is inside a column that is about to stop existing.
           if (a11yBar && barHome) barHome.appendChild(a11yBar);
@@ -510,6 +597,17 @@ export function createCartridge(): Cartridge {
           seed: () => seed,
           geometry: () => geometry,
           frames: () => frames,
+          /**
+           * ⚠️ FOR THE AXE GATE, AND IT IS NOT A BACK DOOR AROUND THE ENGINE. The high-contrast theme
+           * is the engine's to write now; the scan needs to reach a NAMED level without depending on
+           * how many presses of the 🌗 icon it currently takes to get there — which is the engine's
+           * business and would rot this script silently the day it changes. So the scan sets the axis
+           * and the game repaints through the same path the icon uses.
+           */
+          setTema: (tema: VisualState['tema']) => {
+            visual = { ...visual, tema };
+            repaint?.(visual);
+          },
           activate,
           hint: showHint,
           start,

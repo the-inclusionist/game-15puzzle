@@ -142,6 +142,24 @@ The download is asked for separately and **filtered**: `baixarPesados({ apenas }
 derived from the engine's catalogue rather than hand-written. The blanket default would also fetch
 34 MB of MediaPipe vision models and WebGazer, which nothing here uses.
 
+## Contrast and colour vision belong to the engine
+
+The panel used to carry a high-contrast checkbox and a vision `<select>`. It does not any more: on
+engine 9.0.0 the accessibility bar's **🌗 contrast** and **🚥 colour correction** own both, so this
+game looks and behaves like every other one in the catalogue.
+
+⚠️ **Two axes, not one field.** The old select held one value for what ADR-0104 splits into a theme
+and a correction, which means a child who needs high contrast *and* colour correction could only
+have one — the exclusivity ADR-0011's supersession refused. `setTemaDoJogador` and
+`setCorrecaoDoJogador` are two fields because they are two questions.
+
+📌 **What moved out and did not arrive anywhere**, said plainly rather than left to be discovered:
+the select also offered the EMPATHY simulations — `sim-protan`, `sim-deuter`, `sim-tritan` and the
+five low-vision modes. Those are not adaptations a child uses; they are what an adult turns on to
+feel what she experiences. They belong in the engine's `empatia` panel, which a consumer game has to
+build and register itself, and this one does not. **Blind survives** (the bar's 🦯), and every
+adaptation survives. The demonstration modes are gone until somebody decides where they live.
+
 ## Libras
 
 The accessibility bar's 🤟 button toggles a real, persisted mode, and the gov.br VLibras plugin is
