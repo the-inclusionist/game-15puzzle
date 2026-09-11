@@ -21,6 +21,20 @@
          that turns the simulation off, and a child is locked inside it.
          The canvas, the tile grid and the title screen go in here. The panel stays outside. -->
     <div id="world"></div>
+    <!-- The chrome column: the accessibility bar pinned at the top, the panel scrolling under it.
+         ⚠️ BOTH ARE OUTSIDE #world, and for the same reason the panel already was: the engine puts
+         the empathy filter on the element `world()` names, a CSS filter rasterises its whole subtree,
+         and a descendant cannot opt out. `blind` is brightness(0), and these are the controls that
+         turn `blind` off — inside the world they would go black with everything else. -->
+    <div id="side">
+      <!-- Where the engine mounts its seven accessibility icons. Empty on purpose: `createGame`
+           writes into it, given `host.a11yBarHost`.
+           ⚠️ OUR OWN ID, NEVER #title-icons. That is the platformer's id, and the engine's stylesheet
+           positions it absolute at top:10px;left:50% for the platformer's title art. The 2048
+           measured what that costs elsewhere: the bar landed on top of its HUD and elementFromPoint
+           over the score column started returning a .pi-btn. -->
+      <div id="a11y-bar"></div>
+    </div>
   </div>
 </div>
 

@@ -39,6 +39,15 @@ try {
   const page = await context.newPage();
   // A generous viewport first: this is about markup and contrast, not about layout under pressure —
   // the k=2 floor is measured by `tap-target` in the browser test project, where it can be asserted.
+  // ⚠️ THE HEAVY DOWNLOAD IS BLOCKED HERE, IN THE TEST, AND NOT SWITCHED OFF IN THE PRODUCT.
+  // This game asks the engine for the neural voices — ~190 MB of models, so a child who comes back on
+  // day two without a network still has them. Three page loads per run, one per board size, would
+  // fetch that three times and gate the pipeline on somebody else's CDN.
+  //
+  // Blocking it here rather than behind a test flag keeps the production path the one that ships: a
+  // flag would make the behaviour a child actually gets the only behaviour nothing exercises.
+  await page.route(/huggingface\.co|hf\.co|cdn\.jsdelivr\.net|unpkg\.com|webgazer/, (r) => r.abort());
+
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(URL, { waitUntil: 'networkidle' });
   await page.waitForSelector('#sr-status', { timeout: 10_000 });

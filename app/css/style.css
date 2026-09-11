@@ -12,6 +12,46 @@
    break a visible grid of buttons: a clipped focus ring on a corner tile, and a board the mouse
    cannot reach. */
 
+  /* ========================= THE ENGINE'S SHEET =========================
+     The engine mounts DOM this game does not write — the accessibility bar of `.pi-btn` buttons with
+     six state classes, and its pause card — and that markup arrives undressed unless this sheet comes
+     with it. `.pi-btn` sizes itself from `var(--tap)` with no fallback, so without this the buttons
+     collapse to a bare emoji. That is what happened to `game-whackwhack`, which passed the host and
+     skipped the sheet.
+
+     ⚠️ AN @import HERE, NOT AN `import` IN THE ENTRY MODULE, AND THE REASON IS CASCADE ORDER RATHER
+     THAN TASTE. Two sheets that both write `:root` tokens and both name `.sr-only` settle their ties
+     by ORDER, and the order of a JS-injected stylesheet against a <link> in the head is a property of
+     the bundler — which is to say it is not a promise. Written here, everything below is simply
+     later, and this file wins every tie by construction. The precedent is `game-chess`.
+
+     ⚠️ IT DOWNLOADS NOTHING. The one @font-face in that sheet is `src: local(...)`. The 404s the
+     package warns about belong to `vendor/fonts.css`, a separate file this game does not link — and
+     does not need, because the typography panel is unreachable from the bar and filtered out of the
+     pause card this game gets. */
+  @import '@the-inclusionist/engine/style.css';
+
+  /* ===================== THREE RECLAIMS, EACH ONE MEASURED =====================
+     Not taste. Each is a place where 644 lines of somebody else's CSS reach something this game
+     already decided, and each was read before it was written. */
+
+  /* The engine styles `html,body`; this game styles only `body`. Left alone, `html` keeps the
+     engine's --bg (#0b1020) and any overscroll flashes another game's blue behind this one. */
+  html { background: #05070f; }
+
+  /* ⚠️ THE ONE THAT ACTUALLY BREAKS. The engine declares `.hud{…flex-wrap:wrap}` and this game never
+     declares flex-wrap, so it survives the tie — and `wrap` on a column with a definite height turns
+     the panel that is built to SCROLL into two side-by-side columns. `max-width` is the same shape,
+     latent until about k=7. */
+  .hud { flex-wrap: nowrap; max-width: none; }
+
+  /* The engine puts `letter-spacing:.12em` on `html,body` for WCAG 1.4.12, and the `font:` shorthand
+     below does NOT reset it — letter-spacing is not part of that shorthand. Press Start 2P is
+     measured in characters: twenty of them become 22.4, and the invariant that keeps the credit
+     inside a 320-logical-pixel screen breaks by construction. Scoped to the title, not to the page:
+     the engine's spacing is its decision for everything that is prose, and this is a logo. */
+  .title-press { letter-spacing: normal; word-spacing: normal; }
+
   :root { color-scheme: dark; }
   body {
     margin: 0;
@@ -120,9 +160,31 @@
      x = 176..320 of 320 logical pixels: left 55%, width 45%. Roomier than the chess consumer's
      27.5% because --ui-fs is 8k here and 16k there — 144 logical pixels at an 8px base is about
      eighteen characters a line. */
-  .hud {
+  /* The chrome column: bar pinned, panel scrolling under it.
+     ⚠️ `min-height: 0` ON THE PANEL IS LOAD-BEARING. A flex child's default `min-height:auto` refuses
+     to shrink below its content, so without it the panel pushes the bar out of the column instead of
+     scrolling — and the bar is the one row in this game that may not need discovering. */
+  #side {
     position: absolute;
     left: 55%; top: 0; width: 45%; height: 100%;
+    box-sizing: border-box;
+    display: flex; flex-direction: column;
+  }
+
+  /* It WRAPS: at the k=2 floor this column is 288 CSS px and the engine mounts seven 44px buttons,
+     which do not fit on one line. Not a scroller and not `overflow: hidden` — every icon has to be
+     reachable without discovering that it can be scrolled to. */
+  #a11y-bar {
+    flex: 0 0 auto;
+    display: flex; flex-wrap: wrap;
+    gap: calc(var(--ui-fs, 16px) * 0.25);
+    padding: calc(var(--ui-fs, 16px) * 0.3) calc(var(--ui-fs, 16px) * 0.3) 0;
+    box-sizing: border-box;
+  }
+
+  .hud {
+    flex: 1 1 auto;
+    min-height: 0;
     box-sizing: border-box;
     display: flex; flex-direction: column;
     gap: calc(var(--ui-fs, 16px) * 0.35);
@@ -131,10 +193,10 @@
     line-height: 1.25;
     color: #c9d1d9;
     background: #111a24;
-    border-left: 1px solid #2b3a4a;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
+  #side { background: #111a24; border-left: 1px solid #2b3a4a; }
   .hud h2 {
     margin: 0; font-size: 0.7em; font-weight: 600;
     color: #8b949e; text-transform: uppercase; letter-spacing: 0.04em;

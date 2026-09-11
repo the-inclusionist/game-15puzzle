@@ -24,8 +24,9 @@
     "test:a11y": "node scripts/axe-check.mjs",
     "validate": "npm run typecheck && vitest run && vite build"
   },
-  "comment:dependencies": "No neural voice, and that is a decision (ADR-0094). The engine takes `carregarVozNeural` as a PORT; a game that does not pass it narrates through Web Speech, which speaks the right language and weighs nothing, and the audio panel stops offering an engine it could not load. Passing it would mean 27 MB of WASM in the build and 135 MB in node_modules (onnxruntime-web is a non-optional peer of the provider) for a game whose entire spoken content is 'tile 7 to the left'. ADR-0058 targets under 30 MB for a school download; this game is under 1.",
+  "comment:dependencies": "THE NEURAL VOICE IS ON, and this note used to argue the opposite. The old reasoning was 'the entire spoken content of this game is tile 7 to the left', which measured the wrong thing: the voices are not game content. They are narration — the resource of a child who cannot read, for whatever reason — and a sliding puzzle is exactly a game such a child can play, if it is read to her well. The engine takes `carregarVozNeural` as a PORT (ADR-0094) because `onnxruntime-web` is a NON-optional peer of the provider: naming it in the engine would put 135 MB in the node_modules of every consumer, including games that never speak. So the game names it, in one line. THE PRICE, BOTH NUMBERS, because one alone misleads: 27,797 kB of WASM on disk and 6,651 kB over the wire, against 636 kB for the whole of the rest of the game. THIS IS THE STANDALONE BUILD AND THAT IS WHY IT IS ACCEPTABLE — ADR-0140 makes the standalone artifact a development, audit and demonstration route and never a delivery route to a child, so ADR-0058's 30 MB school-download ceiling is not measuring this. In cartridge form the weight is not here at all: `carregarVozNeural` is the HOST's half of CreateGameOptions (ADR-0139), so the import leaves with the shell and the platform pays it once for every cartridge (ADR-0117).",
   "dependencies": {
+    "@mintplex-labs/piper-tts-web": "1.0.4",
     "@the-inclusionist/engine": "8.0.0",
     "pixi.js": "7.4.2"
   },

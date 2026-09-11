@@ -45,6 +45,8 @@ import { createSurface } from '../render/surface.ts';
 import { createTileGrid } from '../ui/tile-grid.ts';
 import { createHud, visionFilter } from '../ui/hud.ts';
 import { alcanceDoModo } from '@the-inclusionist/engine/render/viz-setters.js';
+import { PESADOS, baixarPesados } from '@the-inclusionist/engine/platform/pesados.js';
+import { lerCenaGuardada } from '@the-inclusionist/engine/ui/motion-scene.js';
 import { createTitleScreen } from '../ui/title-screen.ts';
 
 /**
@@ -72,6 +74,11 @@ function boot(): void {
   // in index.html, and `applyLook` below.
   const world = doc.getElementById('world');
   if (!world) throw new Error('#world is missing: the host contract is not met');
+  // The chrome column, and the bar the engine fills. Both outside `#world`: they are the controls
+  // that turn an empathy simulation OFF, and a filter on an ancestor cannot be undone by a child.
+  const side = doc.getElementById('side');
+  const a11yBar = doc.getElementById('a11y-bar');
+  if (!side || !a11yBar) throw new Error('#side / #a11y-bar are missing: the host contract is not met');
 
   const search = new URLSearchParams(location.search);
   const debug = search.get('debug') === 'true';
@@ -97,35 +104,102 @@ function boot(): void {
   const systemReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   let reducedMotion = store.getBool(key('motion'), systemReduced);
 
+  /**
+   * IS MOTION REDUCED — the OR of this game's switch and the engine's calm level.
+   *
+   * ⚠️ MOUNTING THE ACCESSIBILITY BAR GAVE THIS GAME TWO SWITCHES FOR ONE THING. The bar's TEA icon
+   * writes the ENGINE's reduced-motion store; the panel's checkbox writes this game's own key; and
+   * the engine offers no event and no general getter to reconcile them — its `reducedMotion` is four
+   * flags shaped for the platformer (`parallax`, `decor`, `items`, `particles`), and the 2048 wrote
+   * down its refusal to guess which one answers for a tile. Nobody in the catalogue has solved this.
+   *
+   * `items` is the closest of the four to a tile that slides, and reading it is a guess — but a guess
+   * that can only ever ADD reduction is a safe one. The asymmetry is deliberate: turning TEA on quiets
+   * the game, and the checkbox cannot turn motion back ON while calm is asked for, because whoever
+   * asked for calm asked for it whole.
+   *
+   * Read per slide rather than per frame: it is a `getJSON`, cheap once, wasteful sixty times a second.
+   */
+  const motionReduced = (): boolean => reducedMotion || lerCenaGuardada().items === true;
+
   const declaration = createPuzzleDeclaration({ run: () => run, i18n, worldSelector: '#world' });
 
   const engine = createGame({
     declaration,
-    host: { doc, win: window, cvdHost: doc.getElementById('cvd') },
-    // No levels, no pause phase, no gamepad wizard. Declared rather than deduced from a getter that
-    // returns null — and if `semMenuDePausa` were omitted, every arrow, Enter and Space would start
-    // being eaten the moment anything created an element with a pause id.
-    // No gamepad wizard, no pause actor, and no neural voice. Declared rather than deduced from a
-    // getter that returns null.
+    host: {
+      doc, win: window, cvdHost: doc.getElementById('cvd'),
+      /**
+       * WHERE THE SEVEN ACCESSIBILITY ICONS GO, and naming it is the whole fix.
+       *
+       * ⚠️ THE ENGINE REPORTED THIS GAME'S ABSENCE BEFORE IT WAS NOTICED HERE. Left unnamed it looks
+       * for `#title-icons`, the platformer's id, and not finding one it put a line in `problems`:
+       * "a criança não alcança modo cego, TTS, alto contraste nem Libras antes de começar". True —
+       * the title screen covers the panel, so every control was behind a game she could not see to
+       * start. Five of the six games in the catalogue were in that state.
+       *
+       * The engine BUILDS and WIRES the bar from here; the game only says where it fits. Seven
+       * buttons mount: blind, TTS, Libras, TEA and three marked "soon". Contrast, colour-vision and
+       * latching do NOT — the engine only mounts an icon that has somebody to action it, and this
+       * game passes no theme or correction writer and declares `seguraTeclas() === false`. So the
+       * bar does not duplicate the panel's own contrast and vision controls.
+       */
+      a11yBarHost: a11yBar,
+    },
+    // No gamepad wizard and no pause actor. Declared rather than deduced from a getter returning null.
     //
     // ⚠️ `semMenuDePausa` IS GONE, and not because this game stopped wanting it: ADR-0120 made the
     // pause UNDECLINABLE, so the option no longer exists and `pauseHost` decides only WHERE the card
-    // hangs. The engine mounts it. That is a behaviour change for this game — it used to have no
-    // pause at all — and the keyboard is the thing to watch, because the engine's menu handler
-    // listens on the window in CAPTURE while a dialog is open. It only consumes while one IS open,
-    // which is why `isNavigable` can stay true.
-    //
-    // ⚠️ `semVozNeural` IS NEW AND IT CORRECTS A SILENCE, not a behaviour: this game already passed no
-    // `carregarVozNeural`, so it already narrated through Web Speech. What was missing was SAYING so.
-    // The engine measured six games and found three that declined by omission, with nothing anywhere
-    // recording that the choice had been made — declining is a decision, not declaring it was an
-    // absence. The reasoning for declining is unchanged and lives in package.json.
-    declines: { semAssistenteDePad: true, semAtorDePausa: true, semVozNeural: true },
+    // hangs. The engine mounts it. That is a behaviour change here — this game had no pause at all —
+    // and the keyboard is the thing to watch, because the engine's menu handler listens on the window
+    // in CAPTURE. It only consumes while a dialog IS open, which is why `isNavigable` can stay true.
+    declines: { semAssistenteDePad: true, semAtorDePausa: true },
     isNavigable: () => true,
+    /**
+     * THE NEURAL VOICE, which this game used to decline.
+     *
+     * ⚠️ THE REASON FOR DECLINING WAS WRONG, and the correction is the Dev's: the voices are not game
+     * content, so "this puzzle only ever says tile 7 to the left" was measuring the wrong thing. They
+     * are NARRATION — the resource of a child who cannot read, for whatever reason — and a sliding
+     * puzzle is exactly a game such a child can play, if it is read to her well.
+     *
+     * One line, per ADR-0094. The engine cannot name the provider itself: it drags `onnxruntime-web`
+     * in as a NON-optional peer, 135 MB into every consumer's node_modules including games that never
+     * speak. So the game names it, and a game that stays silent keeps Web Speech.
+     */
+    carregarVozNeural: () => import('@mintplex-labs/piper-tts-web'),
+    /**
+     * ⚠️ FALSE HERE, AND THE DOWNLOAD IS ASKED FOR SEPARATELY — see below. The engine's blanket
+     * default fetches the WHOLE heavy catalogue, and most of it is not this game's: 34 MB of
+     * MediaPipe vision models (face, gesture, hand) plus WebGazer, which the 2048's measurement says
+     * fails by CORS on every single load. Nothing here uses a camera.
+     */
+    baixarPesados: false,
     // The sonar needs to know where the listener stands. On a grid that is the cursor's square, so
     // the engine can measure to the targets the declaration hands it.
     sonarPlayers: () => [{ i: 0, x: run.cursor() % run.size, y: Math.floor(run.cursor() / run.size), viz: 'normal' }],
   });
+
+  /**
+   * THE VOICES, AND ONLY THE VOICES.
+   *
+   * `createGame` takes a boolean and does not pass a filter through, but `baixarPesados` itself does,
+   * and its own comment says who for: "Só estas ids, se dado. Serve ao consumidor que quer as vozes e
+   * não o resto." This is that consumer.
+   *
+   * ⚠️ THE LIST IS DERIVED FROM THE CATALOGUE, never written by hand. A voice added upstream arrives
+   * here on its own; a hand-copied list would be a second place to forget.
+   *
+   * Why it runs at all, when the models are ~190 MB: pillar 8 became "first day ONLINE, then
+   * offline-first" (ADR-0116). A child who comes back on day two, with no network, and finds the
+   * voice was never fetched is the case this prevents. It does not block the boot — no `await`, and
+   * the failure is swallowed, because a game that will not start because a voice is missing is worse
+   * than a game that speaks in the browser's own voice.
+   *
+   * 📌 On a catalogue origin this is paid once for every game: Cache Storage is partitioned by ORIGIN,
+   * so `incl-pesados-v1` is shared by siblings served from the same host and by nobody else. ADR-0117
+   * says the platform should be the one asking; until it does, the game asks.
+   */
+  void baixarPesados({ apenas: PESADOS.filter((p) => p.id.startsWith('voz:')).map((p) => p.id) });
 
   if (engine.problems.length) console.warn('host contract:', engine.problems);
   engine.nav.attach();      // createGame does not — see the header
@@ -133,7 +207,7 @@ function boot(): void {
   const surface = createSurface();
   world.appendChild(surface.view);
 
-  const slide = createSlide({ reduced: () => reducedMotion });
+  const slide = createSlide({ reduced: motionReduced });
   const view = createBoardView({
     layer: surface.layer,
     criarDesenho: surface.criarDesenho,
@@ -163,7 +237,7 @@ function boot(): void {
     onVision: (next) => { vision = next; store.set(key('vision'), next); applyLook(); },
     onReducedMotion: (on) => { reducedMotion = on; store.setBool(key('motion'), on); },
   });
-  region.appendChild(hud.root);
+  side.appendChild(hud.root);
 
   /* ===================== THE TWO SCREENS =====================
    *
@@ -179,7 +253,7 @@ function boot(): void {
   const titleScreen = createTitleScreen({
     doc,
     i18n,
-    reducedMotion: () => reducedMotion,
+    reducedMotion: motionReduced,
     onStart: () => start(),
   });
   world.appendChild(titleScreen.root);
