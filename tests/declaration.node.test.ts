@@ -103,6 +103,15 @@ describe('the engine accepts it', () => {
   // The distinction the field turns on: what the game REQUIRES, not what it accepts. Ctrl+Home is a
   // convenience over Home, which works alone, and the arrows reach every cell - so nothing here needs
   // two positions at once, and counting the modifier would report a barrier that is not there.
+  // The second field, and the reason it is a second field: `holdsAtOnce` counts SIMULTANEOUS
+  // positions and refuses zero, so a game that holds nothing still declares one. "One at a time" and
+  // "one HELD" are the same number answering different questions, and latching is offered off THIS
+  // one. A switch that changes nothing is worse than an absent switch for the child who went looking
+  // for it.
+  it('declares that it holds no key down', () => {
+    for (const n of [3, 4, 5]) expect(harness(n).declaration.seguraTeclas(), `size ${n}`).toBe(false);
+  });
+
   it('needs no pointer, and says nothing rather than saying so', () => {
     // `needsPointer` is optional with a safe default of false, and the engine explicitly declines to
     // make three hundred games write `() => false`. A keyboard operates this one completely.

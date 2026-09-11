@@ -105,16 +105,22 @@ function boot(): void {
     // No levels, no pause phase, no gamepad wizard. Declared rather than deduced from a getter that
     // returns null — and if `semMenuDePausa` were omitted, every arrow, Enter and Space would start
     // being eaten the moment anything created an element with a pause id.
-    // No levels, no pause phase, no gamepad wizard, and no neural voice. Declared rather than
-    // deduced from a getter that returns null — and if `semMenuDePausa` were omitted, every arrow,
-    // Enter and Space would start being eaten the moment anything created an element with a pause id.
+    // No gamepad wizard, no pause actor, and no neural voice. Declared rather than deduced from a
+    // getter that returns null.
+    //
+    // ⚠️ `semMenuDePausa` IS GONE, and not because this game stopped wanting it: ADR-0120 made the
+    // pause UNDECLINABLE, so the option no longer exists and `pauseHost` decides only WHERE the card
+    // hangs. The engine mounts it. That is a behaviour change for this game — it used to have no
+    // pause at all — and the keyboard is the thing to watch, because the engine's menu handler
+    // listens on the window in CAPTURE while a dialog is open. It only consumes while one IS open,
+    // which is why `isNavigable` can stay true.
     //
     // ⚠️ `semVozNeural` IS NEW AND IT CORRECTS A SILENCE, not a behaviour: this game already passed no
     // `carregarVozNeural`, so it already narrated through Web Speech. What was missing was SAYING so.
     // The engine measured six games and found three that declined by omission, with nothing anywhere
     // recording that the choice had been made — declining is a decision, not declaring it was an
     // absence. The reasoning for declining is unchanged and lives in package.json.
-    declines: { semMenuDePausa: true, semAssistenteDePad: true, semAtorDePausa: true, semVozNeural: true },
+    declines: { semAssistenteDePad: true, semAtorDePausa: true, semVozNeural: true },
     isNavigable: () => true,
     // The sonar needs to know where the listener stands. On a grid that is the cursor's square, so
     // the engine can measure to the targets the declaration hands it.

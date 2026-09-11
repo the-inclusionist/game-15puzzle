@@ -130,6 +130,24 @@ export function createPuzzleDeclaration(deps: DeclarationDeps): GameDeclaration 
       return 1;
     },
 
+    /**
+     * FALSE. Nothing in this game is ever held down.
+     *
+     * ⚠️ AND `holdsAtOnce` ABOVE DOES NOT ANSWER THIS, which is the finding that made the engine add
+     * a second field: that one counts SIMULTANEOUS POSITIONS and refuses zero, so a game that holds
+     * nothing still declares one. "One at a time" and "one HELD" are the same number and different
+     * facts, and everything downstream was reading the number that answers the other question.
+     *
+     * Here every input is a discrete press: an arrow steps the cursor one cell, Enter slides once.
+     * Holding an arrow does not glide the cursor and holding Enter does not repeat a slide, so
+     * latching — the control offered to a player who cannot keep a key down — would be a switch that
+     * changes nothing. Offering it would be worse than not having it: a child with a motor
+     * difficulty would spend the one affordance she was looking for on a control that does nothing.
+     */
+    seguraTeclas(): boolean {
+      return false;
+    },
+
     // Where the "no timer" decision LIVES: not merely absent, DECLARED. WCAG 2.2.1 (Timing
     // Adjustable) is inapplicable because of this line, and scanning may take as long as it likes.
     tick: 'player',

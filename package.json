@@ -26,7 +26,7 @@
   },
   "comment:dependencies": "No neural voice, and that is a decision (ADR-0094). The engine takes `carregarVozNeural` as a PORT; a game that does not pass it narrates through Web Speech, which speaks the right language and weighs nothing, and the audio panel stops offering an engine it could not load. Passing it would mean 27 MB of WASM in the build and 135 MB in node_modules (onnxruntime-web is a non-optional peer of the provider) for a game whose entire spoken content is 'tile 7 to the left'. ADR-0058 targets under 30 MB for a school download; this game is under 1.",
   "dependencies": {
-    "@the-inclusionist/engine": "8.0.0-rc.1",
+    "@the-inclusionist/engine": "8.0.0",
     "pixi.js": "7.4.2"
   },
   "devDependencies": {
