@@ -933,3 +933,15 @@ export function createCartridge(): Cartridge {
     },
   };
 }
+
+/**
+ * THE DEFAULT EXPORT, FOR `inclusionist-check-cartridge` AND FOR THE PLATFORM (ADR-0139 §2).
+ *
+ * The engine's bin reads `{ slug, declaration, hooks, create }` from the default export and runs
+ * `cartridgeRefusals` against them AT IMPORT, without a `document` or a `window`. The platform does
+ * the same at `mount` time. Calling `createCartridge()` here is safe: ADR-0139's own first gate
+ * («a cartridge that is imported and never instantiated must do nothing observable») is pinned by
+ * `tests/cartridge.browser.test.ts`, and the factory's cost is bounded by the Node-only paths it
+ * takes (no DOM creation, no listener registration, just a store built around `null` localStorage).
+ */
+export default createCartridge();

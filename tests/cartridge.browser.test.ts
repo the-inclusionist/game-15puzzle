@@ -35,19 +35,28 @@ interface Scene { name: string; enter?: () => void; exit?: () => void }
 function stubEngine() {
   const stack: Scene[] = [];
   const filters: (string | null)[] = [];
+  const spoken: string[] = [];
   return {
     problems: [] as readonly string[],
     keyboard: { actionOf: () => null },
-    cenas: {
+    scenes: {
       push(s: Scene) { stack.push(s); s.enter?.(); },
       replace(s: Scene) { stack.pop()?.exit?.(); stack.push(s); s.enter?.(); },
       pop() { const s = stack.pop(); s?.exit?.(); return s; },
       top: () => stack[stack.length - 1] ?? null,
     },
+    pause: { show: () => {}, hide: () => {} },
     nav: { attach() { /* the shell's job, not the cartridge's */ }, sharedDialogOpen: () => null },
     applyVisionFilter(f: string | null) { filters.push(f); },
+    // Engine 11's root-owned translator (ADR-0232 D3). The stub returns the key, which is enough
+    // for every assertion in this file — none of them reads the actual sentence.
+    t: (key: string) => key,
+    locale: () => 'pt',
+    say: (text: string) => { spoken.push(text); },
+    alert: (text: string) => { spoken.push(text); },
     _stack: stack,
     _filters: filters,
+    _spoken: spoken,
   };
 }
 
