@@ -148,7 +148,10 @@ interface EngineLike {
     top(): { name: string } | null;
   };
   readonly nav: { attach(): void; sharedDialogOpen(): unknown };
-  applyVisionFilter(filter: string | null, alcance: unknown): void;
+  /** Engine 11's root-owned translator (ADR-0232 D3). The game reads through these two arrows. */
+  readonly t: (key: string, params?: Record<string, string | number>) => string;
+  readonly locale: () => string;
+  applyVisionFilter(filter: string | null, reach: unknown): void;
 }
 
 const SLUG = 'game-15puzzle';
@@ -268,6 +271,64 @@ export function createCartridge(): Cartridge {
       // the neural voice loads is the DECISION OF `uses: { neuralVoice }` on the shell's createGame
       // (step 11f), not of a decline here.
       declines: { noPauseActor: true },
+
+      /**
+       * ⚠️ EVERY GAME_KEYED ACCOMMODATION ANSWERED, OR THE BOOT REFUSES (ADR-0153, engine 11.0.0).
+       *
+       * `AccommodationAnswers` is `Readonly<Record<GameKeyedAccommodation, AccommodationKeys | false>>`
+       * — the KEYS, not the words. A missing key is a malformed declaration; `false` is «no subject in
+       * this game», which is explicit so a silence cannot decide for a child.
+       *
+       * The one subject this game has is **hints**: the button that illuminates tiles. Everything
+       * else — a wheelchair, an easy mode, text pace, tile-matching suits, aim assist, owner colours
+       * — has no subject in a sliding-tile puzzle.
+       */
+      accommodations: {
+        hints: { labelKey: 'accom.hints.label', hintKey: 'accom.hints.hint' },
+        cameraSway: false,
+        easyMode: false,
+        wheelchairMode: false,
+        detectionLeniency: false,
+        intensity: false,
+        reducedCharacterMotion: false,
+        caneSpacing: false,
+        textPace: false,
+        lexicalDifficulty: false,
+        wordHighlight: false,
+        pieceSets: false,
+        distinguishableSuits: false,
+        timingWindow: false,
+        aimAssist: false,
+        repeatedInput: false,
+        ownerColors: false,
+        contrastOutlines: false,
+      },
+
+      /**
+       * THE GENRE, OPTIONAL. `'Traditional puzzle game'` is a leaf of the engine's `Puzzle` family in
+       * `core/genres` — exactly the one that fits a sliding-tile puzzle. Declaring one costs a line
+       * and informs the engine's genre-keyed derivations (ADR-0156).
+       */
+      genre: 'Traditional puzzle game',
+
+      /**
+       * THE POSITIONS THIS GAME USES, with the KEYS of their words — resolved at every drawing in the
+       * page's language (ADR-0074, ADR-0232 D3 erratum). The engine takes the keys and asks the
+       * translator for each one at every surface — remap screen, help, scan, pad.
+       *
+       * ⚠️ `start` AND `select` ARE NOT HERE. They belong to the pause (ADR-0144 §4, ADR-0155), and
+       * `startClaimProblem`/`selectClaimProblem` would refuse the boot if they were.
+       *
+       * Four directions move the cursor; `action1` activates the tile under it (slides it, or pushes
+       * a whole line). Shuffle and hint arrive in step 11e as `action4` and `action3`.
+       */
+      preset: {
+        up: { labelKey: 'preset.up.label' },
+        down: { labelKey: 'preset.down.label' },
+        left: { labelKey: 'preset.left.label' },
+        right: { labelKey: 'preset.right.label' },
+        action1: { labelKey: 'preset.action1.label', hintKey: 'preset.action1.hint' },
+      },
       isNavigable: () => true,
 
       /**
@@ -308,7 +369,18 @@ export function createCartridge(): Cartridge {
       const win = doc.defaultView;
       if (!win) throw new Error('the region is not in a rendered document');
 
-      const i18n = createI18n(win);
+      /**
+       * TIE THE GAME'S i18n WRAPPER TO THE ENGINE'S TRANSLATOR. Engine 11 made `t` and `locale`
+       * methods of a `Translator` the ROOT builds (ADR-0232 D3), and the game now reads through
+       * `engine.t` / `engine.locale`. The arrows are LATE: `onChange` on this wrapper listens to
+       * `i18n:change` on `window`, and when it fires `provider.t()` and `.locale()` go through to
+       * the engine's new values.
+       */
+      const i18n = createI18n({
+        t: () => engine.t,
+        locale: () => engine.locale(),
+        win,
+      });
 
       const seedParam = Number(params.get('seed'));
       let seed = Number.isFinite(seedParam) && seedParam > 0 ? seedParam >>> 0 : Date.now() >>> 0;

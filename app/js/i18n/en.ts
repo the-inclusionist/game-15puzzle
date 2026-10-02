@@ -67,6 +67,19 @@ const en: Catalog = {
     'size.4': '4 by 4, 15 tiles',
     'size.5': '5 by 5, 24 tiles',
 
+
+    // ---- ADR-0153 accommodation (hints) ---------------------------------------
+    'accom.hints.label': 'Hints',
+    'accom.hints.hint': 'Shows the next three tiles to move.',
+
+    // ---- ADR-0074 preset words -----------------------------------------------
+    'preset.up.label': 'Up',
+    'preset.down.label': 'Down',
+    'preset.left.label': 'Left',
+    'preset.right.label': 'Right',
+    'preset.action1.label': 'Slide',
+    'preset.action1.hint': 'Slides the tile under the cursor into the empty square.',
+
     'legal.licence': 'Free software under AGPL-3.0-or-later.',
     'legal.source': 'Source code',
   },

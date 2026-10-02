@@ -94,7 +94,7 @@ statement and does **not** inherit the AGPL.
 
 | Component | Licence | Note |
 |---|---|---|
-| `@the-inclusionist/engine` | AGPL-3.0-or-later | Same owner. From public npmjs. ⚠️ **Declared TWICE and that is not redundancy** (ADR-0140 §4): `^9.0.0` as a **peer**, so a platform installs exactly one copy for six games, and **9.0.0** exact as a devDependency, so a clean clone still builds. Its stylesheet is pulled in by `@import` in `app/css/style.css` and ships inside the APP build only. |
+| `@the-inclusionist/engine` | AGPL-3.0-or-later | Same owner. From public npmjs. ⚠️ **Declared TWICE and that is not redundancy** (ADR-0140 §4): `^11.0.0` as a **peer**, so a platform installs exactly one copy for six games, and **11.0.0** exact as a devDependency, so a clean clone still builds. Its stylesheet is pulled in by `@import` in `app/css/style.css` and ships inside the APP build only. |
 | `@mintplex-labs/piper-tts-web` 1.0.4 | **MIT** | The neural voice provider, named here because the engine takes it as a port and cannot name it itself (ADR-0094). |
 | `onnxruntime-web` | **MIT** | Not declared by this repository and not optional: it is a hard peer of the provider above, and it is what the 27,797 kB `ort-wasm-simd-threaded.jsep.wasm` in `dist/` is. |
 | PixiJS 7.4.2 | MIT | Peer and devDependency, same reasoning. Pinned to the engine's **exact** version in dev — a second PixiJS in one page is a bug, not a fallback. |

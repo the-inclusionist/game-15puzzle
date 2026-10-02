@@ -14,7 +14,7 @@ import { createI18n } from '../app/js/i18n/index.ts';
 import type { EmpathyPanel } from '../app/js/ui/empathy-panel.ts';
 import type { VisualState } from '@the-inclusionist/engine/render/viz-axes.js';
 
-const i18n = createI18n(window);
+const i18n = createI18n(null);
 let mounted: { host: HTMLElement; panel: EmpathyPanel } | null = null;
 
 function mount(initial: Partial<VisualState> = {}) {

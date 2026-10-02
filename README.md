@@ -102,7 +102,7 @@ ADR-0068 §4, and ADR-0067 §5 is why it lives there rather than in a `.github` 
 record declares. It runs with `a11y: true`, which is not a default: the input exists so that skipping
 pillar 2 is a visible line rather than an absence.
 
-The engine comes from **public npmjs**, pinned exact at `9.0.0` (ADR-0072), so the gate has
+The engine comes from **public npmjs**, pinned exact at `11.0.0` (ADR-0072), so the gate has
 everything it needs: `npm ci` resolves from the registry and there is no sibling directory to be
 missing. That was the last thing standing between this repository and a green pipeline.
 
@@ -144,8 +144,8 @@ derived from the engine's catalogue rather than hand-written. The blanket defaul
 
 ## Contrast and colour vision belong to the engine
 
-The panel used to carry a high-contrast checkbox and a vision `<select>`. It does not any more: on
-engine 9.0.0 the accessibility bar's **🌗 contrast** and **🚥 colour correction** own both, so this
+The panel used to carry a high-contrast checkbox and a vision `<select>`. It does not any more: the
+accessibility bar's **🌗 contrast** and **🚥 colour correction** own both since engine 9, so this
 game looks and behaves like every other one in the catalogue.
 
 ⚠️ **Two axes, not one field.** The old select held one value for what ADR-0104 splits into a theme

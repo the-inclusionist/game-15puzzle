@@ -77,6 +77,19 @@ const pt: Catalog = {
     'size.4': '4 por 4, 15 peças',
     'size.5': '5 por 5, 24 peças',
 
+
+    // ---- ADR-0153 accommodation (hints), engine-drawn row --------------------
+    'accom.hints.label': 'Dicas',
+    'accom.hints.hint': 'Mostra as próximas três peças a mover.',
+
+    // ---- ADR-0074 preset words for the five positions this game uses ---------
+    'preset.up.label': 'Para cima',
+    'preset.down.label': 'Para baixo',
+    'preset.left.label': 'Para a esquerda',
+    'preset.right.label': 'Para a direita',
+    'preset.action1.label': 'Deslizar',
+    'preset.action1.hint': 'Desliza a peça sob o cursor para o espaço vazio.',
+
     // ---- AGPL section 13 ------------------------------------------------------------------
     // The obligation the licence creates, as something a player can act on. See docs/LICENSES.md.
     'legal.licence': 'Software livre sob AGPL-3.0-or-later.',

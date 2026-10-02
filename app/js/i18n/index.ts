@@ -21,7 +21,12 @@
 // whoever listens to `onChange` — which the chess consumer does not do, and which is why its HUD
 // keeps the old language after a switch.
 
-import { getLocale, registerDict, t as engineT, bcp47 as engineBcp47 } from '@the-inclusionist/engine/core/i18n.js';
+// ⚠️ ENGINE 11 FACTORED `core/i18n` INTO A `createTranslator()`. The module-level `getLocale`,
+// `registerDict` and `t` are gone — they are methods on a `Translator` the ROOT builds (ADR-0232 D3,
+// erratum: one translator per root). This game stops being its own root for translation: the shell
+// hands it the `t()` and `locale()` of the engine's translator, and `bcp47(code)` — still a free
+// function — is imported directly.
+import { bcp47 as engineBcp47, type Translate } from '@the-inclusionist/engine/core/i18n.js';
 import type { Speakable } from '@the-inclusionist/engine/core/contract.js';
 import type { Catalog, LocaleCode } from './types.ts';
 import type { Direction, Move } from '../puzzle/types.ts';
@@ -61,18 +66,38 @@ export interface I18n {
 }
 
 /**
- * Register the three catalogues and hand back the accessors.
+ * The provider the shell hands in. Both arrows are LATE-BOUND — the factory may be called before
+ * `createGame` returns (the declaration takes an `I18n` at factory time), so the arrows let the shell
+ * swap the real engine translator in afterwards without the cartridge rebuilding anything.
  *
- * ⚠️ CALL THIS BEFORE `createGame()`. `createGame` runs `initI18n`, which translates the static
- * markup; keys registered after that point are correct in `t()` and stale in the DOM.
+ * ⚠️ A `null` provider is a stub for the pt dictionary only — used by the factory before the engine
+ * exists. The declaration never calls these at factory time (the forwarders fire at engine time),
+ * so the stub never has to translate for a child.
  */
-export function createI18n(win: Window | null = typeof window === 'undefined' ? null : window): I18n {
-  for (const code of Object.keys(CATALOGS) as LocaleCode[]) {
-    registerDict(code, CATALOGS[code].strings);
-  }
+export interface I18nProvider {
+  readonly t: () => Translate;
+  readonly locale: () => string;
+  /** The window the game listens on for `i18n:change`. */
+  readonly win?: Window | null;
+}
+
+/**
+ * Register-less: the engine does it, by `dictionaries` on `createGame` (ADR-0232 D3 erratum).
+ * This factory only wraps the engine's translator in the game's own vocabulary helpers
+ * (describeTile, direction, describePush) that know about this game's nouns and patterns.
+ */
+export function createI18n(provider: I18nProvider | null = null): I18n {
+  // The stub: pt dictionary, direct lookup, no params. Used at factory time by the declaration.
+  const stubT: Translate = (key, params) => {
+    const raw = CATALOGS.pt.strings[key] ?? key;
+    return params
+      ? raw.replace(/\{(\w+)\}/g, (_, k) => String(params[k] ?? ''))
+      : raw;
+  };
+  const t: Translate = (k, p) => (provider ? provider.t()(k, p) : stubT(k, p));
 
   const locale = (): LocaleCode => {
-    const code = getLocale();
+    const code = provider?.locale() ?? 'pt';
     return code === 'en' || code === 'es' ? code : 'pt';
   };
   const catalog = (): Catalog => CATALOGS[locale()];
@@ -87,25 +112,30 @@ export function createI18n(win: Window | null = typeof window === 'undefined' ? 
   };
 
   return {
-    t: engineT,
+    t,
     locale,
     bcp47: () => engineBcp47(locale()),
     describeTile: named,
     describeBlank: () => ({ ...catalog().blank }),
     describeObjective: () => ({ ...catalog().objective }),
-    direction: (d: Direction) => engineT(`dir.${d}`),
+    direction: (d: Direction) => t(`dir.${d}`),
     describeMove: (move: Move) =>
-      engineT('a11y.move', { tile: named(move.tile).text, dir: engineT(`dir.${move.direction}`) }),
+      t('a11y.move', { tile: named(move.tile).text, dir: t(`dir.${move.direction}`) }),
     describePush(push: readonly Move[]) {
       const first = push[0];
       if (!first) return '';
-      const dir = engineT(`dir.${first.direction}`);
+      const dir = t(`dir.${first.direction}`);
       return push.length === 1
-        ? engineT('a11y.move', { tile: named(first.tile).text, dir })
-        : engineT('a11y.moveMany', { count: push.length, dir });
+        ? t('a11y.move', { tile: named(first.tile).text, dir })
+        : t('a11y.moveMany', { count: push.length, dir });
     },
     onChange(fn) {
-      if (!win) return () => { /* no window: nothing dispatches, nothing to unsubscribe */ };
+      // The engine's translator dispatches `i18n:change` on `window` whenever the page's language
+      // changes (`platform/locale-host.applied`), and that is the signal every root follows per
+      // ADR-0232 D3 erratum point 3. If the provider gave us no window (factory time, a Node test),
+      // nothing fires and there is nothing to unsubscribe from.
+      const win = provider?.win;
+      if (!win) return () => { /* no window */ };
       const handler = (): void => fn();
       win.addEventListener('i18n:change', handler);
       return () => win.removeEventListener('i18n:change', handler);

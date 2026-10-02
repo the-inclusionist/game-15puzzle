@@ -16,7 +16,7 @@ import type { Hud } from '../app/js/ui/hud.ts';
 import type { Run } from '../app/js/puzzle/run.ts';
 import type { Size } from '../app/js/render/geometry.ts';
 
-const i18n = createI18n(window);
+const i18n = createI18n(null);
 const solver = createSolver();
 let mounted: { region: HTMLElement; hud: Hud } | null = null;
 

@@ -67,6 +67,19 @@ const es: Catalog = {
     'size.4': '4 por 4, 15 fichas',
     'size.5': '5 por 5, 24 fichas',
 
+
+    // ---- ADR-0153 acomodación (pistas) ---------------------------------------
+    'accom.hints.label': 'Pistas',
+    'accom.hints.hint': 'Muestra las próximas tres piezas que mover.',
+
+    // ---- ADR-0074 vocabulario del preset --------------------------------------
+    'preset.up.label': 'Arriba',
+    'preset.down.label': 'Abajo',
+    'preset.left.label': 'Izquierda',
+    'preset.right.label': 'Derecha',
+    'preset.action1.label': 'Deslizar',
+    'preset.action1.hint': 'Desliza la pieza bajo el cursor al hueco.',
+
     'legal.licence': 'Software libre bajo AGPL-3.0-or-later.',
     'legal.source': 'Código fuente',
   },

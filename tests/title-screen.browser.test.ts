@@ -13,7 +13,7 @@ import { solved } from '../app/js/puzzle/board.ts';
 import { boardGeometry } from '../app/js/render/geometry.ts';
 import type { TitleScreen } from '../app/js/ui/title-screen.ts';
 
-const i18n = createI18n(window);
+const i18n = createI18n(null);
 const solver = createSolver();
 let mounted: { region: HTMLElement; screen: TitleScreen } | null = null;
 

@@ -25,7 +25,7 @@ import { createRun } from '../app/js/puzzle/run.ts';
 import { createSolver } from '../app/js/puzzle/solver.ts';
 import { legalMoves, solved } from '../app/js/puzzle/board.ts';
 
-const i18n = createI18n(window);
+const i18n = createI18n(null);
 const solver = createSolver();
 
 const frame = (): Promise<void> =>

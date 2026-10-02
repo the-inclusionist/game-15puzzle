@@ -23,7 +23,6 @@
 //  4. The cartridge, then the loop.
 
 import { createGame } from '@the-inclusionist/engine';
-import { registerDict } from '@the-inclusionist/engine/core/i18n.js';
 import { srAlert, setVlibrasSay } from '@the-inclusionist/engine/core/a11y-sr.js';
 import { vlibrasSay, vlTick } from '@the-inclusionist/engine/ui/vlibras.js';
 import { startLoop } from '@the-inclusionist/engine/core/loop.js';
@@ -83,12 +82,19 @@ function mount(): void {
 
   const cartridge = createCartridge();
 
-  // ⚠️ THE SHELL REGISTERS, NOT THE CARTRIDGE (ADR-0139). Which locales exist and when they are
-  // installed is a statement about the page. The cartridge exports the catalogues and never decides
-  // when they land — which is also why this has to happen before `createGame` runs `initI18n`.
-  for (const [code, catalog] of Object.entries(cartridge.dicts)) registerDict(code, catalog.strings);
-
   const engine = createGame({
+    /**
+     * THIS GAME'S WORDS. Engine 11 took `dictionaries` as a REQUIRED companion to anything the
+     * declaration names by key — accommodations, preset, hud, gameOptions, howToPlay (ADR-0232 D3
+     * erratum). The old `registerDict` loop in this shell is gone; the engine's translator registers
+     * everything itself from this map before anything is drawn.
+     *
+     * ⚠️ WE PASS THE INNER `.strings`, not the catalog objects. The cartridge exports `dicts` with
+     * the full `Catalog` shape (nouns, patterns, strings); the engine wants just the string table.
+     */
+    dictionaries: Object.fromEntries(
+      Object.entries(cartridge.dicts).map(([code, catalog]) => [code, catalog.strings]),
+    ),
     declaration: cartridge.declaration,
     host: {
       doc,

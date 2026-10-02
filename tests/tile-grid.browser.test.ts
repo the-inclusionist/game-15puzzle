@@ -20,7 +20,7 @@ import { boardGeometry, SIZES } from '../app/js/render/geometry.ts';
 import type { Run } from '../app/js/puzzle/run.ts';
 import type { TileGrid } from '../app/js/ui/tile-grid.ts';
 
-const i18n = createI18n(window);
+const i18n = createI18n(null);
 const solver = createSolver();
 
 let mounted: { region: HTMLElement; grid: TileGrid } | null = null;
