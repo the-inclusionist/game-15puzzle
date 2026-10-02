@@ -31,7 +31,6 @@ import { createTileGrid } from './ui/tile-grid.ts';
 import { createHud, visionFilter } from './ui/hud.ts';
 import { createTitleScreen } from './ui/title-screen.ts';
 
-import { srAlert, srSay } from '@the-inclusionist/engine/core/a11y-sr.js';
 import { createStorage } from '@the-inclusionist/engine/platform/storage.js';
 import { gameKey } from '@the-inclusionist/engine/platform/storage-keys.js';
 import { readStoredScene } from '@the-inclusionist/engine/ui/motion-scene.js';
@@ -149,6 +148,10 @@ interface EngineLike {
   /** Engine 11's root-owned translator (ADR-0232 D3). The game reads through these two arrows. */
   readonly t: (key: string, params?: Record<string, string | number>) => string;
   readonly locale: () => string;
+  /** The engine's own live-region announcer — `engine.alert` is assertive, `engine.say` polite
+   *  (ADR-0054). Replaces the module-level `srAlert`/`srSay` of engines 8–10. */
+  readonly alert: (text: string) => void;
+  readonly say: (text: string) => void;
   applyVisionFilter(filter: string | null, reach: unknown): void;
 }
 
@@ -721,7 +724,7 @@ export function createCartridge(): Cartridge {
         grid.focusCursor();
         // The board has just arrived and she cannot see it. One sentence, the same one the grid
         // carries as its own label — said once here because nothing else announces an arrival.
-        srSay(`${i18n.t('a11y.boardLabel', { size: (run as Run).size })}. ${i18n.t('a11y.gridHint')}`);
+        engine.say(`${i18n.t('a11y.boardLabel', { size: (run as Run).size })}. ${i18n.t('a11y.gridHint')}`);
       }
 
       function playing(): boolean { return engine.scenes.top()?.name === 'playing'; }
@@ -771,7 +774,7 @@ export function createCartridge(): Cartridge {
         view.setGeometry(geometry);
         grid.rebuild();
         grid.setHint([]);
-        srSay(i18n.t(announcement, { size, need: size * size - 1 }));
+        engine.say(i18n.t(announcement, { size, need: size * size - 1 }));
       }
 
       function activate(index: number): void {
@@ -779,32 +782,32 @@ export function createCartridge(): Cartridge {
         if (slide.active()) return;        // one move at a time; the guard chess needed too
         const r = run as Run;
         const result = r.activate(index);
-        if (result.kind === 'blocked') { srSay(i18n.t('a11y.blocked')); return; }
-        if (result.kind === 'blank') { srSay(i18n.t('a11y.blankCell')); return; }
+        if (result.kind === 'blocked') { engine.say(i18n.t('a11y.blocked')); return; }
+        if (result.kind === 'blank') { engine.say(i18n.t('a11y.blankCell')); return; }
 
         hint = [];
         grid.setHint([]);
         slide.begin(result.push, r.size, geometry.cell + geometry.gap);
         grid.refresh();
 
-        // ⚠️ ONE announcement per completed move, never two. `srSay` is `aria-live="polite"`, which
+        // ⚠️ ONE announcement per completed move, never two. `engine.say` is `aria-live="polite"`, which
         // QUEUES: splitting the move and the count into two utterances would put the reader a move
         // behind the board and keep it there.
         const first = result.push[0];
-        srSay(i18n.t(result.push.length === 1 ? 'a11y.moved' : 'a11y.movedMany', {
+        engine.say(i18n.t(result.push.length === 1 ? 'a11y.moved' : 'a11y.movedMany', {
           tile: i18n.describeTile(first.tile).text,
           count: result.push.length,
           dir: i18n.direction(first.direction),
           have: r.tilesHome(),
           need: r.size * r.size - 1,
         }));
-        if (r.solved()) srAlert(i18n.t('status.solved', { moves: r.moves() }));
+        if (r.solved()) engine.alert(i18n.t('status.solved', { moves: r.moves() }));
       }
 
       function showHint(): void {
         const r = run as Run;
         const presses = r.hint(3);
-        if (!presses.length) { srSay(i18n.t('a11y.hintNone')); return; }
+        if (!presses.length) { engine.say(i18n.t('a11y.hintNone')); return; }
         // ⚠️ THE TILES, NOT AN ARROW. An arrow says "something arrives here"; what she has to know is
         // which tiles she is about to shift — and with a push that is up to four at once.
         const next = presses[0];
@@ -815,7 +818,7 @@ export function createCartridge(): Cartridge {
         r.setCursor(next[next.length - 1].from);
         grid.refresh();
         grid.focusCursor();
-        srSay(i18n.t('a11y.hint', { moves: presses.map((p) => i18n.describePush(p)).join(', ') }));
+        engine.say(i18n.t('a11y.hint', { moves: presses.map((p) => i18n.describePush(p)).join(', ') }));
       }
 
       // The language can change under a running game; anything JavaScript BUILT has to rebuild. The

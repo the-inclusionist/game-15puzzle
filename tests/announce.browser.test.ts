@@ -18,7 +18,12 @@
 // behind the board and keeps it there. So "how many" is a gate here, not a detail.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { srAlert, srSay } from '@the-inclusionist/engine/core/a11y-sr.js';
+// ⚠️ `srAlert`/`srSay` AS MODULE FUNCTIONS WERE REMOVED IN ENGINE 11. The engine now exports
+// `createAnnouncer({ doc, raf })` which returns an `{ say, alert, … }` object; the production path
+// goes through `engine.alert`/`engine.say`. For this test we build a local announcer against the
+// browser document and ask it the same questions.
+import { createAnnouncer } from '@the-inclusionist/engine/core/a11y-sr.js';
+const { say: srSay, alert: srAlert } = createAnnouncer({ doc: document, raf: requestAnimationFrame });
 import { createI18n } from '../app/js/i18n/index.ts';
 import { createPuzzleDeclaration } from '../app/js/declaration/puzzle-declaration.ts';
 import { createRun } from '../app/js/puzzle/run.ts';

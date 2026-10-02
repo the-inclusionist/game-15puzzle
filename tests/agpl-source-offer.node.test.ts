@@ -159,27 +159,16 @@ describe('ADR-0037 — no configurable address for a room', () => {
   });
 });
 
-describe('SIL OFL — the notice travels with the font', () => {
-  const fonts = join(root, 'app', 'public', 'fonts');
-
-  // ⚠️ `public/` AND NOT `css/`, AND IT IS A LICENCE DECISION RATHER THAN A LAYOUT ONE. OFL 1.1
-  // requires the notice to be distributed WITH the font. A `.txt` sitting beside a BUNDLED `.woff2`
-  // is referenced by nothing, so the bundler copies the font into `assets/` under a content hash and
-  // leaves the licence behind — a built artifact carrying the typeface and not its terms. Vite
-  // copies `public/` verbatim, so the two arrive together, same names, same directory.
-  it('keeps the font and its licence in the directory that ships verbatim', () => {
-    expect(readFileSync(join(fonts, 'press-start-2p-400.woff2')).byteLength).toBeGreaterThan(1000);
-    const notice = readFileSync(join(fonts, 'press-start-2p.OFL.txt'), 'utf8');
-    expect(notice).toContain('SIL OPEN FONT LICENSE');
-    expect(notice).toContain('Reserved Font Name');
-    expect(notice).toContain('Copyright 2012 The Press Start 2P Project Authors');
-  });
-
-  it('is referenced by the stylesheet at the path that directory is served from', () => {
-    const css = readFileSync(join(root, 'app', 'css', 'style.css'), 'utf8');
-    expect(css).toContain("url('/fonts/press-start-2p-400.woff2')");
-  });
-
+describe('SIL OFL — the font is the engine`s now, the licence travels with it', () => {
+  // ⚠️ TWO ASSERTIONS WERE RETIRED HERE, AND THAT IS THE DECISION OF STEP 11f. This game used to
+  // vendor `press-start-2p-400.woff2` and its `OFL.txt` under `app/public/fonts/`. Engine 11.0.0
+  // ships a font library that holds the family with its SHA256 pinned; the game declares
+  // `uses: { fonts: ['Press Start 2P'] }` and `inclusionist-heavy dist --fonts "Press Start 2P"`
+  // writes the file into the delivery at build time. The OFL notice travels in the engine's own
+  // `assets/vendor/`, so the «notice beside font» discipline moved WITH the font — upstream.
+  //
+  // The one assertion that stays belongs here regardless: the game names the typeface in its
+  // licence record, because a third-party licence in a file nobody lists is still a gap.
   it('is named in docs/LICENSES.md, because a third-party licence in a file nobody lists is a gap', () => {
     const doc = readFileSync(join(root, 'docs', 'LICENSES.md'), 'utf8');
     expect(doc).toContain('Press Start 2P');

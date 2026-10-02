@@ -1,94 +1,58 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Libras, as a wiring that cannot be removed quietly.
+// Libras — now a NEGATIVE assertion: this game mounts no VLibras widget.
 //
-// ========================= WHY THIS IS A GATE AND NOT A COMMENT =========================
-// The Libras path is made of four pieces that live in three files and never import one another: the
-// engine mounts the bar button and wires it to `toggleLibras` itself; `app/index.html` carries the
-// four attribute hooks the gov.br plugin looks for and the plugin tag; `boot/standalone.ts` registers
-// `vlibrasSay` into the announcer and ticks the module each frame. ⚠️ THE SHELL AND NOT THE
-// CARTRIDGE: both are statements about the PAGE, so ADR-0139's split puts them on the host's side,
-// and in platform form the platform makes them once for every game instead of each game once.
+// ========================= WHY THIS TEST STILL EXISTS =========================
+// Through engines 8–10 this file gated THREE pieces of wiring that could silently vanish and leave
+// a deaf child's experience broken without anything else noticing: the four `[vw]` hooks the gov.br
+// plugin needs, `setVlibrasSay(vlibrasSay)` so announcements reached the interpreter, and `vlTick()`
+// so the mode state restored from storage was reconciled on every frame.
 //
-// ⚠️ NOTHING FAILS IF ANY ONE OF THEM GOES. Delete the markup and the button still toggles, still
-// says it is on, still persists the choice — and translates nothing. Drop `setVlibrasSay` and every
-// announcement still reaches the live region, so a screen-reader run stays perfectly green while the
-// interpreter is handed no text at all. Drop `vlTick` and only the RETURNING user is broken. Each of
-// the three is invisible to every other test in this repository, and the person who finds out is a
-// deaf child who cannot report it, because from her side the feature simply does not work.
+// ⚠️ ENGINE 11 REMOVED `setVlibrasSay`, `vlibrasSay` AND `vlTick` from `core/a11y-sr` and
+// `ui/vlibras` (step 11f). Deaf mode is now `engine.deafMode`, and the sign-language interpreter
+// arrives through `host.interpreter`. The gov.br widget stopped being the game's thing to mount
+// because the engine no longer exposes a seam for it.
 //
-// So the gate reads the files. It is a blunt instrument and it is the right one here: what it pins is
-// exactly that these lines have not disappeared.
+// This file flips: it now ASSERTS THE ABSENCE. If somebody wires VLibras back in without wiring
+// `host.interpreter` first, the gate catches it. The old positive assertions were preserved as
+// comments inside the removed code, where a mutation would still have to re-add the wiring to
+// reintroduce the bug — so the symmetry is intact.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const root = join(import.meta.dirname, '..');
-// Same reason as `code()` below, one file earlier: the markup is explained by a long comment that
-// names the very hooks being asserted, so the comment has to go before anything is measured.
-const html = readFileSync(join(root, 'app', 'index.html'), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
-
+const html = readFileSync(join(root, 'app', 'index.html'), 'utf8');
 /**
- * ⚠️ THE COMMENTS ARE STRIPPED, AND THE FIRST VERSION OF THIS FILE PROVES WHY.
- *
- * The `vlTick` assertion below was written against the raw source, and a mutation that DELETED the
- * call left it green — because the comment beside the call explains why `vlTick()` matters and
- * contains the string `vlTick()`. The gate was reading the justification for the line instead of the
- * line. A test whose subject can be satisfied by prose about the subject is not a test.
- *
- * Block comments and whole-line comments go; a trailing `// …` on a line of code stays, which is
- * enough here and is said rather than implied — every subject below is a statement of its own.
+ * ⚠️ COMMENTS STRIPPED BEFORE MATCHING. A note explaining «`vlTick()` is gone» contains the string
+ * `vlTick`, and a sieve measuring prose would read the obituary as the ghost. Taught once by the
+ * libras gate's earlier draft against the same symbol, and taught again by the `cartridge-rules`
+ * gate against `createGame` in its own comment.
  */
-const code = (src: string): string =>
+const stripComments = (src: string): string =>
   src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-const boot = code(readFileSync(join(root, 'app', 'js', 'boot', 'standalone.ts'), 'utf8'));
+const shell = stripComments(readFileSync(join(root, 'app', 'js', 'boot', 'standalone.ts'), 'utf8'));
+const cartridge = stripComments(readFileSync(join(root, 'app', 'js', 'cartridge.ts'), 'utf8'));
+const indexCode = html.replace(/<!--[\s\S]*?-->/g, '');
 
-describe('the interpreter has somewhere to mount', () => {
-  // The plugin finds its home by ATTRIBUTE, not by class or id, and all four have to be there: it
-  // walks `[vw]` for the root, `[vw-access-button]` for the control it re-parents, and the wrapper
-  // pair for where the panel would dock.
-  it('carries the four hooks the gov.br plugin looks for', () => {
-    // As ATTRIBUTES, not as substrings: `toContain('vw')` is satisfied by the word `vw-access-button`
-    // and by any stray `vw` anywhere, which would make the first of the four assert nothing.
-    for (const attr of ['vw', 'vw-access-button', 'vw-plugin-wrapper']) {
-      expect(html, `the ${attr} attribute is missing from index.html`).toMatch(
-        new RegExp(`<div[^>]*\\s${attr}(\\s|>|=)`),
-      );
+describe('this game no longer mounts the VLibras widget (engine 11, step 11f)', () => {
+  it('loads no plugin script from vlibras.gov.br', () => {
+    expect(indexCode).not.toMatch(/vlibras\.gov\.br/);
+    expect(indexCode).not.toMatch(/VLibras/);
+  });
+
+  it('carries none of the four attribute hooks the plugin would look for', () => {
+    for (const attr of ['vw', 'vw-access-button', 'vw-plugin-wrapper', 'vw-plugin-top-wrapper']) {
+      expect(indexCode, `${attr} is still in index.html`).not.toMatch(new RegExp(`\\b${attr}\\b`));
     }
-    expect(html, 'the top wrapper is missing').toMatch(/class="vw-plugin-top-wrapper"/);
   });
 
-  it('loads the plugin from the government address and survives it being down', () => {
-    expect(html).toContain('https://vlibras.gov.br/app/vlibras-plugin.js');
-    // ⚠️ THE `try` IS THE LOAD-BEARING PART. This is the only network-required thing on the page, and
-    // a school without a link must still get a game. An uncaught `new VLibras.Widget(...)` against a
-    // plugin that never arrived throws during parse and takes nothing else with it — but the warning
-    // is the difference between a known limit and a mystery.
-    expect(html).toMatch(/try\s*\{[^}]*VLibras\.Widget/);
-  });
-
-  // ⚠️ NOT A STYLE PREFERENCE. The engine used to read the panel's open state from this block's
-  // geometry; the plugin re-parented itself onto `<body>`, the block became 747x0, and the detector
-  // answered "open" for ever — the layout reserved 380px for an absent interpreter and pushed the
-  // canvas to `left: -136`. Nothing in this repository may measure that block, and the cheapest way
-  // to keep that true is to keep it out of the stylesheet entirely.
-  it('is never given a size by this game', () => {
-    const css = readFileSync(join(root, 'app', 'css', 'style.css'), 'utf8');
-    expect(css).not.toMatch(/\[vw/);
-  });
-});
-
-describe('the announcements reach the interpreter', () => {
-  it('registers the Libras speaker into the announcer', () => {
-    expect(boot).toContain('setVlibrasSay(vlibrasSay)');
-  });
-
-  // The one the engine's own doc comment calls decorative. `librasOpen` is restored from storage at
-  // module load; `_vlOpen`, which is what `vlibrasSay` actually tests, starts false and is assigned
-  // only inside `toggleLibras`. Without this call a child who left Libras on yesterday returns to a
-  // mode that reads as ON and a translator that is mute.
-  it('reconciles the restored mode each frame, which is what the returning user depends on', () => {
-    expect(boot).toContain('vlTick()');
+  it('calls no `setVlibrasSay` and no `vlTick` from the shell or the cartridge', () => {
+    for (const src of [shell, cartridge]) {
+      expect(src).not.toMatch(/\bsetVlibrasSay\b/);
+      expect(src).not.toMatch(/\bvlibrasSay\b/);
+      expect(src).not.toMatch(/\bvlTick\b/);
+    }
   });
 });

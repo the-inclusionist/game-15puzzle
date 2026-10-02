@@ -23,11 +23,8 @@
 //  4. The cartridge, then the loop.
 
 import { createGame } from '@the-inclusionist/engine';
-import { srAlert, setVlibrasSay } from '@the-inclusionist/engine/core/a11y-sr.js';
-import { vlibrasSay, vlTick } from '@the-inclusionist/engine/ui/vlibras.js';
 import { startLoop } from '@the-inclusionist/engine/core/loop.js';
 import { createLayout } from '@the-inclusionist/engine/ui/layout.js';
-import { HEAVY_FILES, downloadHeavy } from '@the-inclusionist/engine/platform/heavy.js';
 
 import { createCartridge } from '../cartridge.ts';
 import { createRng } from '../puzzle/rng.ts';
@@ -120,41 +117,22 @@ function mount(): void {
     // that has already been wrong once. `declines` was one of the five, and it lived here.
     ...cartridge.hooks,
     /**
-     * THE NEURAL VOICE — the host's half, which is why it is here and not in the cartridge.
+     * WHAT THIS GAME USES (ADR-0216, ADR-0255). Engine 11 took the delivery of narration AND fonts
+     * out of the game's hands: `uses: { neuralVoice, fonts }` says what to make available, and the
+     * engine imports its own Kokoro runtime at the first neural utterance («o jogo não deve precisar
+     * saber como isso funciona») and streams the declared fonts from the font library.
      *
-     * The voices are NARRATION, the resource of a child who cannot read, and a sliding puzzle is
-     * exactly a game such a child can play if it is read to her well. The engine takes the provider
-     * as a PORT (ADR-0094) because `onnxruntime-web` is a non-optional peer: naming it in the engine
-     * would put 135 MB in every consumer's node_modules, including games that never speak.
+     * ⚠️ `piper-tts-web` AND `carregarVozNeural` ARE GONE. The engine ships its own Kokoro — espeak-ng
+     * + onnxruntime-web — and the 27 MB WASM leaves this game's dependency tree with them.
      *
-     * 📌 In cartridge form this line does not exist and the platform carries it once for every game
-     * (ADR-0117), which is the whole of the arithmetic — Cache Storage is partitioned by origin, so
-     * one platform pays once where six PWAs would each pay in full.
+     * `fonts: ['Press Start 2P']` names what the title screen draws with. The library serves it from
+     * `heavy/` with a SHA256-pinned `@font-face` the engine writes; `app/public/fonts/` goes away in
+     * this commit together with the local `@font-face` rule. `npx inclusionist-heavy dist --fonts
+     * "Press Start 2P"` writes the file into the delivery at build time (step 11g wires that into the
+     * script).
      */
-    carregarVozNeural: () => import('@mintplex-labs/piper-tts-web'),
-    /**
-     * ⚠️ FALSE, AND THE DOWNLOAD IS ASKED FOR SEPARATELY. The engine's blanket default fetches the
-     * whole heavy catalogue, and most of it is not this game's: 34 MB of MediaPipe vision models plus
-     * WebGazer, which the 2048's measurement says fails by CORS on every load. Nothing here uses a
-     * camera.
-     */
-    downloadHeavy: false,
+    uses: { neuralVoice: true, fonts: ['Press Start 2P'] },
   });
-
-  /**
-   * THE VOICES, AND ONLY THE VOICES. `createGame` takes a boolean and does not pass a filter through,
-   * but `downloadHeavy` itself does, and its own comment names the consumer: «Só estas ids, se dado.
-   * Serve ao consumidor que quer as vozes e não o resto.»
-   *
-   * ⚠️ DERIVED FROM THE CATALOGUE, never hand-written: a voice added upstream arrives on its own.
-   * It does not block the boot and its failure is swallowed — a game that will not start because a
-   * voice is missing is worse than a game that speaks in the browser's own voice.
-   */
-  void downloadHeavy({ only: HEAVY_FILES.filter((p) => p.id.startsWith('voz:')).map((p) => p.id) });
-
-  // LIBRAS — the announcements reach the interpreter and not only the live region. The bar's button
-  // and the mode are the engine's; this is the translator being handed the text.
-  setVlibrasSay(vlibrasSay);
 
   engine.nav.attach();      // createGame does not — see the header
 
@@ -229,10 +207,10 @@ function mount(): void {
    * screen stop, now owned by the engine (`engine.onFailure` — screen reader, narration and a
    * visible line all at once). The console line is for whoever is reading one.
    */
-  startLoop(rafTicker(), (dt) => {
-    vlTick();
-    instance.update(dt);
-  }, 2, {
+  // ⚠️ `vlTick()` IS GONE WITH THE REST OF VLIBRAS. Engine 11 owns deaf mode as `engine.deafMode`
+  // and the sign-language interpreter arrives through `host.interpreter`. Until there is an
+  // interpreter the game cares about, the loop does one thing per frame: tell the cartridge.
+  startLoop(rafTicker(), (dt) => instance.update(dt), 2, {
     speed: engine.gameSpeed,
     onFailure: (failure: unknown) => { console.error(failure); engine.onFailure(failure); },
   });

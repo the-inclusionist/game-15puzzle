@@ -248,19 +248,14 @@
      fixed, decorative, and the opposite of what the engine's typography roster exists for. On a
      NAME seen once it is the right instrument, because it is a logo. On the board's digits it would
      override the face a child chose for herself, which is the one thing typography settings are
-     for. `title-screen.browser` pins the scope. */
-  /* ⚠️ SERVED FROM `public/`, NOT BUNDLED, AND THAT IS A LICENCE DECISION. SIL OFL 1.1 requires the
-     notice to be distributed WITH the font. A `.txt` beside a bundled `.woff2` is referenced by
-     nothing, so the bundler would copy the font into `dist/assets/` with a content hash and leave
-     the licence behind — a built artifact carrying the font and not its terms. `public/` is copied
-     verbatim, so the two arrive together, with the same names, in the same directory.
-     `fonts.browser` fetches the notice to prove it. */
-  @font-face {
-    font-family: 'Press Start 2P';
-    src: url('/fonts/press-start-2p-400.woff2') format('woff2');
-    font-weight: 400;
-    font-display: swap;
-  }
+     for. `title-screen.browser` pins the scope.
+
+     ⚠️ NO LOCAL `@font-face` ANY MORE. The engine's font library serves this face from `heavy/`
+     (step 11f, ADR-0255): `uses: { fonts: ['Press Start 2P'] }` on `createGame` tells the engine
+     which family to make available, `inclusionist-heavy dist --fonts "Press Start 2P"` writes the
+     bytes into the delivery with the pinned SHA256, and `startLibraryFonts` writes the `@font-face`
+     rule into the document. The `app/public/fonts/press-start-2p-400.woff2` and its `OFL.txt` leave
+     the repository with that rule — the licence travels in the engine's own `assets/vendor/`. */
 
   .screen {
     position: absolute;

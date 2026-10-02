@@ -95,11 +95,9 @@ statement and does **not** inherit the AGPL.
 | Component | Licence | Note |
 |---|---|---|
 | `@the-inclusionist/engine` | AGPL-3.0-or-later | Same owner. From public npmjs. ⚠️ **Declared TWICE and that is not redundancy** (ADR-0140 §4): `^11.0.0` as a **peer**, so a platform installs exactly one copy for six games, and **11.0.0** exact as a devDependency, so a clean clone still builds. Its stylesheet is pulled in by `@import` in `app/css/style.css` and ships inside the APP build only. |
-| `@mintplex-labs/piper-tts-web` 1.0.4 | **MIT** | The neural voice provider, named here because the engine takes it as a port and cannot name it itself (ADR-0094). |
-| `onnxruntime-web` | **MIT** | Not declared by this repository and not optional: it is a hard peer of the provider above, and it is what the 27,797 kB `ort-wasm-simd-threaded.jsep.wasm` in `dist/` is. |
 | PixiJS 7.4.2 | MIT | Peer and devDependency, same reasoning. Pinned to the engine's **exact** version in dev — a second PixiJS in one page is a bug, not a fallback. |
 | Vite, Vitest, Playwright, TypeScript | MIT / Apache-2.0 | Development only; none ships. |
-| **Press Start 2P** by CodeMan38 | **SIL OFL 1.1** | The title screen's typeface, and only the title screen's — see below. Vendored at `app/public/fonts/`, with `press-start-2p.OFL.txt` beside it. |
+| **Press Start 2P** by CodeMan38 | **SIL OFL 1.1** | The title screen's typeface, served by the engine's font library — see below. Declared on `createGame({ uses: { fonts: ['Press Start 2P'] } })`. The licence travels in the engine's `assets/vendor/`. |
 | **VLibras** (`vlibras.gov.br`) | *not asserted — see below* | The Libras interpreter. **Loaded from the government's address at runtime and never vendored**, so this repository redistributes none of it and takes no position on its terms. It is the only third-party, network-required component on the page. |
 
 ⚠️ **THE VOICE SECTION HERE USED TO SAY THE OPPOSITE**, and it is replaced rather than edited,
@@ -112,15 +110,19 @@ against how much this game says was measuring the wrong thing.
 table at that point: everything from PixiJS down rendered as plain text in any Markdown viewer. Both
 are fixed here.
 
-**What ships and what does not** — and it is now a build target rather than a plan. `npm run build`
-emits the standalone PWA; `npm run build:lib` emits `dist-lib/cartridge.js`, which is what
-`package.json`'s `exports` publishes and which `scripts/check-cartridge.mjs` refuses to let carry any
-of the below: `piper-tts-web` and the
-ONNX runtime are in **this** build, which ADR-0140 defines as a development, audit and demonstration
-artifact and never a delivery route to a child. In cartridge form `carregarVozNeural` is the host's
-half of `CreateGameOptions` (ADR-0139), so neither appears in the published module and the platform
-carries them once for every cartridge (ADR-0117). The same line divides VLibras: the markup and the
-script tag live in `app/index.html`, which is the standalone shell.
+**What ships and what does not.** `npm run build` emits the standalone PWA; `npm run build:lib`
+emits `dist-lib/cartridge.js`, which is what `package.json`'s `exports` publishes and which
+`scripts/check-cartridge.mjs` refuses to let carry anything the engine's own delivery owns.
+
+⚠️ **The neural voice runtime is the engine's now.** On engine 11.0.0 (ADR-0216) the engine ships
+its own Kokoro — espeak-ng + onnxruntime-web — and loads it lazily at the first neural utterance.
+The game stopped declaring `carregarVozNeural` and stopped carrying `piper-tts-web`; `onnxruntime-web`
+is in the engine's dependency tree, not this one.
+
+⚠️ **VLibras is retired.** Engine 11 made `setVlibrasSay` / `vlibrasSay` / `vlTick` leave as public
+surface; deaf mode is now `engine.deafMode`, and the sign-language interpreter arrives through
+`host.interpreter`. The gov.br plugin is not loaded by this game any more — there is no interpreter
+to hand text to. Resumed when a `host.interpreter` candidate is picked.
 
 ### The upstream this game remakes
 

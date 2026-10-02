@@ -28,7 +28,6 @@
   "comment:dependencies": "THE NEURAL VOICE IS ON, and this note used to argue the opposite. The old reasoning was 'the entire spoken content of this game is tile 7 to the left', which measured the wrong thing: the voices are not game content. They are narration — the resource of a child who cannot read, for whatever reason — and a sliding puzzle is exactly a game such a child can play, if it is read to her well. The engine takes `carregarVozNeural` as a PORT (ADR-0094) because `onnxruntime-web` is a NON-optional peer of the provider: naming it in the engine would put 135 MB in the node_modules of every consumer, including games that never speak. So the game names it, in one line. THE PRICE, BOTH NUMBERS, because one alone misleads: 27,797 kB of WASM on disk and 6,651 kB over the wire, against 636 kB for the whole of the rest of the game. THIS IS THE STANDALONE BUILD AND THAT IS WHY IT IS ACCEPTABLE — ADR-0140 makes the standalone artifact a development, audit and demonstration route and never a delivery route to a child, so ADR-0058's 30 MB school-download ceiling is not measuring this. In cartridge form the weight is not here at all: `carregarVozNeural` is the HOST's half of CreateGameOptions (ADR-0139), so the import leaves with the shell and the platform pays it once for every cartridge (ADR-0117).",
   "devDependencies": {
     "@axe-core/playwright": "^4.10.0",
-    "@mintplex-labs/piper-tts-web": "1.0.4",
     "@the-inclusionist/engine": "11.0.0",
     "@types/node": "^22.0.0",
     "@vitest/browser": "^4.0.0",
