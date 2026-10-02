@@ -2,7 +2,7 @@
 // render/board-view — what the canvas draws, and it never draws a letter.
 //
 // ========================= PIXIJS IS NOT IMPORTED HERE =========================
-// This module takes a `Camada` to add to and a `CriarDesenho` to make drawings with, both from the
+// This module takes a `Layer` to add to and a `CreateDrawing` to make drawings with, both from the
 // engine's `render/port.ts`, which is structural types and no renderer. The composition root — the
 // only place PixiJS is known — hands in `() => new PIXI.Graphics()`. That is the adapter ADR-0035
 // promised, in the shape the port says works: a VERB handed in, not an object borrowed.
@@ -13,7 +13,7 @@
 // ========================= ZERO GLYPHS IS STRUCTURAL HERE =========================
 // ADR-0027 says the framebuffer holds no glyphs, because a screen reader cannot read a pixel. In
 // this game that is not a rule anyone has to remember: `render/port.ts` HAS NO TEXT PRIMITIVE —
-// `Desenho` is clear, beginFill, drawRect, endFill, and `DesenhoComLinha` adds lineStyle, moveTo and
+// `Desenho` is clear, beginFill, drawRect, endFill, and `DrawingWithLine` adds lineStyle, moveTo and
 // lineTo. A glyph in the framebuffer is unrepresentable rather than merely unwritten, and the test
 // asserts the recorder saw nothing else.
 //
@@ -25,7 +25,7 @@
 // platform's own `:focus-visible` ring is the cursor — which respects forced-colors mode, as a
 // rectangle drawn on a canvas cannot. One fewer thing to draw, and a better one.
 
-import type { Camada, CriarDesenho, DesenhoComLinha } from '@the-inclusionist/engine/render/port.js';
+import type { Layer, CreateDrawing, DrawingWithLine } from '@the-inclusionist/engine/render/port.js';
 import type { Board } from '../puzzle/types.ts';
 import { homeOf } from '../puzzle/board.ts';
 import type { BoardGeometry, Rect } from './geometry.ts';
@@ -58,8 +58,8 @@ export interface BoardView {
 }
 
 export interface BoardViewDeps {
-  readonly layer: Camada;
-  readonly criarDesenho: CriarDesenho<DesenhoComLinha>;
+  readonly layer: Layer;
+  readonly createDrawing: CreateDrawing<DrawingWithLine>;
   readonly geometry: BoardGeometry;
   readonly palette: Palette;
 }
@@ -67,7 +67,7 @@ export interface BoardViewDeps {
 const hex = (colour: string): number => parseInt(colour.replace('#', ''), 16);
 
 export function createBoardView(deps: BoardViewDeps): BoardView {
-  const g = deps.criarDesenho();
+  const g = deps.createDrawing();
   deps.layer.addChild(g);
   let geometry = deps.geometry;
   let palette = deps.palette;

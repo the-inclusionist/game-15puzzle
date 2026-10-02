@@ -29,7 +29,7 @@ import { createCartridge } from '../app/js/cartridge.ts';
 import { createRng } from '../app/js/puzzle/rng.ts';
 import type { GameInstance } from '../app/js/cartridge.ts';
 
-interface Scene { nome: string; enter?: () => void; exit?: () => void }
+interface Scene { name: string; enter?: () => void; exit?: () => void }
 
 /** Everything `EngineLike` promises and nothing more, so a cartridge reaching further fails loudly. */
 function stubEngine() {
@@ -45,7 +45,7 @@ function stubEngine() {
       top: () => stack[stack.length - 1] ?? null,
     },
     nav: { attach() { /* the shell's job, not the cartridge's */ }, sharedDialogOpen: () => null },
-    aplicarFiltroDeVisao(f: string | null) { filters.push(f); },
+    applyVisionFilter(f: string | null) { filters.push(f); },
     _stack: stack,
     _filters: filters,
   };

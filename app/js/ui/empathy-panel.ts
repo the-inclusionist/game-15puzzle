@@ -27,8 +27,8 @@
 // quem enxerga mal, esconder atrás de um clique é quase o mesmo que não ter movido.»
 
 import { VIZ_MODES, VIZ_FILTER } from '@the-inclusionist/engine/render/viz-modes.js';
-import { simulacaoIndisponivel } from '@the-inclusionist/engine/render/viz-axes.js';
-import type { Simulacao, VisualState } from '@the-inclusionist/engine/render/viz-axes.js';
+import { simulationUnavailable } from '@the-inclusionist/engine/render/viz-axes.js';
+import type { Simulation, VisualState } from '@the-inclusionist/engine/render/viz-axes.js';
 import type { I18n } from '../i18n/index.ts';
 
 /**
@@ -57,7 +57,7 @@ export interface EmpathyPanelDeps {
   readonly i18n: I18n;
   /** The child's current visual state — read fresh, because the bar can change it while this is open. */
   readonly visual: () => VisualState;
-  readonly onPick: (simulacao: Simulacao) => void;
+  readonly onPick: (simulacao: Simulation) => void;
 }
 
 export interface EmpathyPanel {
@@ -136,7 +136,7 @@ export function createEmpathyPanel(deps: EmpathyPanelDeps): EmpathyPanel {
     rows.push(entry);
     input.addEventListener('change', () => {
       if (!input.checked) return;
-      deps.onPick(key === 'normal' ? null : (key as Simulacao));
+      deps.onPick(key === 'normal' ? null : (key as Simulation));
       refresh();
     });
     return entry;
@@ -167,10 +167,10 @@ export function createEmpathyPanel(deps: EmpathyPanelDeps): EmpathyPanel {
      * Disabled AND told, rather than hidden: a row that vanishes teaches that the thing is not for
      * her, which is exactly the lesson ADR-0106 §5 says a dead control gives.
      */
-    const blocked = simulacaoIndisponivel({ ...v, simulacao: 'sim-protan' });
+    const blocked = simulationUnavailable({ ...v, simulacao: 'sim-protan' });
     for (const r of rows) {
       const catalogue = VIZ_MODES.find((m) => m.key === r.mode);
-      r.name.textContent = r.mode === 'normal' ? i18n.t('empathy.none') : i18n.t(catalogue?.nome ?? '');
+      r.name.textContent = r.mode === 'normal' ? i18n.t('empathy.none') : i18n.t(catalogue?.name ?? '');
       r.desc.textContent = r.mode === 'normal' ? i18n.t('empathy.noneHint') : i18n.t(catalogue?.desc ?? '');
       const isOff = r.mode === 'normal';
       r.input.checked = isOff ? v.simulacao === null : v.simulacao === r.mode;

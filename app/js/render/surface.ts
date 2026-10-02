@@ -19,14 +19,14 @@
 
 import * as PIXI from 'pixi.js';
 import { LOGICAL_H, LOGICAL_W } from './geometry.ts';
-import type { Camada, CriarDesenho, DesenhoComLinha } from '@the-inclusionist/engine/render/port.js';
+import type { Layer, CreateDrawing, DrawingWithLine } from '@the-inclusionist/engine/render/port.js';
 
 export interface Surface {
   readonly view: HTMLCanvasElement;
-  /** Handed to the board view as a `Camada` — it only ever adds and removes children. */
-  readonly layer: Camada;
+  /** Handed to the board view as a `Layer` — it only ever adds and removes children. */
+  readonly layer: Layer;
   /** The verb the board view draws with. The adapter ADR-0035 promised, in the port's own shape. */
-  readonly criarDesenho: CriarDesenho<DesenhoComLinha>;
+  readonly createDrawing: CreateDrawing<DrawingWithLine>;
   /** Structurally satisfies `startLoop`'s Ticker. */
   readonly ticker: { add: (fn: () => void) => void; deltaTime: number };
   render(): void;
@@ -60,8 +60,8 @@ export function createSurface(): Surface {
 
   return {
     view,
-    layer: app.stage as unknown as Camada,
-    criarDesenho: () => new PIXI.Graphics() as unknown as DesenhoComLinha,
+    layer: app.stage as unknown as Layer,
+    createDrawing: () => new PIXI.Graphics() as unknown as DrawingWithLine,
     ticker: app.ticker,
     render: () => app.renderer.render(app.stage),
     destroy: () => app.destroy(true),

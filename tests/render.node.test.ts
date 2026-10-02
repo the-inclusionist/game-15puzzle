@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { createSlide } from '../app/js/render/slide.ts';
 import { createBoardView } from '../app/js/render/board-view.ts';
 import { legalMoves, solved } from '../app/js/puzzle/board.ts';
-import type { DesenhoComLinha } from '@the-inclusionist/engine/render/port.js';
+import type { DrawingWithLine } from '@the-inclusionist/engine/render/port.js';
 
 describe('geometry — the numbers, checked rather than trusted', () => {
   it('keeps the tray inside the safe area at every size', () => {
@@ -280,7 +280,7 @@ describe('slide — one clock, whole pixels', () => {
 });
 
 describe('board-view — and the recorder never sees a glyph', () => {
-  /** A fake `DesenhoComLinha` that records what it was asked to do. No PixiJS, no canvas. */
+  /** A fake `DrawingWithLine` that records what it was asked to do. No PixiJS, no canvas. */
   function recorder() {
     const calls: { op: string; args: number[] }[] = [];
     const self = {
@@ -292,7 +292,7 @@ describe('board-view — and the recorder never sees a glyph', () => {
       moveTo(...a: number[]) { calls.push({ op: 'moveTo', args: a }); return self; },
       lineTo(...a: number[]) { calls.push({ op: 'lineTo', args: a }); return self; },
     };
-    return { self: self as unknown as DesenhoComLinha, calls };
+    return { self: self as unknown as DrawingWithLine, calls };
   }
 
   function view(size = 4) {
@@ -300,7 +300,7 @@ describe('board-view — and the recorder never sees a glyph', () => {
     const added: unknown[] = [];
     const v = createBoardView({
       layer: { addChild: (c) => { added.push(c); return c; }, removeChild: (c) => c },
-      criarDesenho: () => r.self,
+      createDrawing: () => r.self,
       geometry: boardGeometry(size),
       palette: NORMAL,
     });

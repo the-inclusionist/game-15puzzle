@@ -27,8 +27,8 @@ import { registerDict } from '@the-inclusionist/engine/core/i18n.js';
 import { srAlert, setVlibrasSay } from '@the-inclusionist/engine/core/a11y-sr.js';
 import { vlibrasSay, vlTick } from '@the-inclusionist/engine/ui/vlibras.js';
 import { startLoop } from '@the-inclusionist/engine/core/loop.js';
-import { initLayout, layout } from '@the-inclusionist/engine/ui/layout.js';
-import { PESADOS, baixarPesados } from '@the-inclusionist/engine/platform/pesados.js';
+import { createLayout } from '@the-inclusionist/engine/ui/layout.js';
+import { HEAVY_FILES, downloadHeavy } from '@the-inclusionist/engine/platform/heavy.js';
 
 import { createCartridge } from '../cartridge.ts';
 import { createRng } from '../puzzle/rng.ts';
@@ -109,7 +109,7 @@ function mount(): void {
       a11yBarHost: a11yBar,
     },
     // ⚠️ EVERY GAME-OWNED FIELD COMES FROM THE CARTRIDGE, SPREAD RATHER THAN LISTED. Engine 9.0.0
-    // exports `GanchosDoCartucho` — the fifteen fields ADR-0139 §1 puts on the game's side, after the
+    // exports `CartridgeHooks` — the fifteen fields ADR-0139 §1 puts on the game's side, after the
     // erratum that moved five of them — so listing them here again would be a second copy of a list
     // that has already been wrong once. `declines` was one of the five, and it lived here.
     ...cartridge.hooks,
@@ -132,19 +132,19 @@ function mount(): void {
      * WebGazer, which the 2048's measurement says fails by CORS on every load. Nothing here uses a
      * camera.
      */
-    baixarPesados: false,
+    downloadHeavy: false,
   });
 
   /**
    * THE VOICES, AND ONLY THE VOICES. `createGame` takes a boolean and does not pass a filter through,
-   * but `baixarPesados` itself does, and its own comment names the consumer: «Só estas ids, se dado.
+   * but `downloadHeavy` itself does, and its own comment names the consumer: «Só estas ids, se dado.
    * Serve ao consumidor que quer as vozes e não o resto.»
    *
    * ⚠️ DERIVED FROM THE CATALOGUE, never hand-written: a voice added upstream arrives on its own.
    * It does not block the boot and its failure is swallowed — a game that will not start because a
    * voice is missing is worse than a game that speaks in the browser's own voice.
    */
-  void baixarPesados({ apenas: PESADOS.filter((p) => p.id.startsWith('voz:')).map((p) => p.id) });
+  void downloadHeavy({ only: HEAVY_FILES.filter((p) => p.id.startsWith('voz:')).map((p) => p.id) });
 
   // LIBRAS — the announcements reach the interpreter and not only the live region. The bar's button
   // and the mode are the engine's; this is the translator being handed the text.
@@ -171,7 +171,7 @@ function mount(): void {
    * 📏 MEASURED BEFORE THIS LINE EXISTED: `engine.problems` held «mundo declarado não encontrado:
    * #world». `createGame` resolves the declaration's `world()` selector at boot, and after the
    * cartridge conversion `#world` is created by `create(ctx)` — which necessarily runs later. The
-   * effect was diagnostic only, because `aplicarFiltroDeVisao` resolves the selector at the point of
+   * effect was diagnostic only, because `applyVisionFilter` resolves the selector at the point of
    * use, but a diagnostic that is wrong is worse than one that is missing.
    *
    * ⚠️ AND IT SHOWED THE RECORD'S CLAIM WAS NARROWER THAN THE DEFECT. ADR-0142 says `problems` and
@@ -194,9 +194,20 @@ function mount(): void {
     (window as unknown as Record<string, unknown>).__puzzle = { ...instance.debug, engine };
   }
 
-  initLayout({ numJogadores: () => 1 });
-  layout();
-  window.addEventListener('resize', layout);
+  /**
+   * ⚠️ `createLayout(ctx)` IS A FACTORY NOW. `initLayout`/`layout` were module-level in engine 8–9
+   * and gone in 11.0.0 (`ui/layout.d.ts`): a `Layout` object with its own `.layout()` method, and the
+   * ctx takes `afterScale` as a REQUIRED port because the engine stopped reaching for the CRT by
+   * import (ADR-0232 D2c). A game with no CRT passes `() => {}` and the record asks it to say so.
+   */
+  const stage = createLayout({
+    doc: document,
+    win: window,
+    numPlayers: () => 1,
+    afterScale: () => { /* no CRT in this game */ },
+  });
+  stage.layout();
+  window.addEventListener('resize', stage.layout);
 
   /**
    * ⚠️ THE LOOP IS THE SHELL'S (ADR-0139 §3), AND `dt` IS IN FRAMES.
@@ -205,15 +216,19 @@ function mount(): void {
    * the platform one loop calls each mounted cartridge's `update(dt)`; here there is one cartridge
    * and the shape is the same.
    *
-   * `aoFalhar` is where spec D16 lives — one broken game must stay distinguishable from a broken
-   * engine. It reaches `srAlert`, because a stopped screen is invisible to a child who cannot see it,
-   * and the console line is for whoever is reading one.
+   * `onFailure` is where spec D16 lives — one broken game must stay distinguishable from a broken
+   * engine. In 11.0.0 the loop's option object changed from `{ aoFalhar }` to **required**
+   * `{ speed, onFailure }` (ADR-0232 D2c erratum): `speed` is read every frame so a child's choice
+   * takes effect on the next one; `onFailure` is the one-shot channel of whoever cannot see the
+   * screen stop, now owned by the engine (`engine.onFailure` — screen reader, narration and a
+   * visible line all at once). The console line is for whoever is reading one.
    */
   startLoop(rafTicker(), (dt) => {
     vlTick();
     instance.update(dt);
   }, 2, {
-    aoFalhar: (error: unknown) => { console.error(error); srAlert(String(error)); },
+    speed: engine.gameSpeed,
+    onFailure: (failure: unknown) => { console.error(failure); engine.onFailure(failure); },
   });
 }
 

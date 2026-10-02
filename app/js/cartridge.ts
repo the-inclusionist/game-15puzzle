@@ -33,11 +33,12 @@ import { createTitleScreen } from './ui/title-screen.ts';
 import { createEmpathyPanel } from './ui/empathy-panel.ts';
 
 import { srAlert, srSay } from '@the-inclusionist/engine/core/a11y-sr.js';
-import * as store from '@the-inclusionist/engine/platform/storage.js';
-import { lerCenaGuardada } from '@the-inclusionist/engine/ui/motion-scene.js';
+import { createStorage } from '@the-inclusionist/engine/platform/storage.js';
+import { gameKey } from '@the-inclusionist/engine/platform/storage-keys.js';
+import { readStoredScene } from '@the-inclusionist/engine/ui/motion-scene.js';
 import { VIZ_MODES } from '@the-inclusionist/engine/render/viz-modes.js';
-import { alcanceDoModo, lerVisualGuardado } from '@the-inclusionist/engine/render/viz-setters.js';
-import { PADRAO } from '@the-inclusionist/engine/render/viz-axes.js';
+import { reachOfMode, readStoredVisual } from '@the-inclusionist/engine/render/viz-setters.js';
+import { DEFAULT_VISUAL } from '@the-inclusionist/engine/render/viz-axes.js';
 
 import type { Size } from './render/geometry.ts';
 import type { Run } from './puzzle/run.ts';
@@ -45,7 +46,7 @@ import type { Solver } from './puzzle/solver.ts';
 import type { GameDeclaration } from '@the-inclusionist/engine/core/contract.js';
 // ⚠️ THE BARE SPECIFIER, not a `boot/…` subpath: the engine's export map routes `.` to
 // `dist-pkg/boot/create-game` and publishes no `./boot/*` pattern at all.
-import type { GanchosDoCartucho } from '@the-inclusionist/engine';
+import type { CartridgeHooks } from '@the-inclusionist/engine';
 import type { VisualState } from '@the-inclusionist/engine/render/viz-axes.js';
 
 /** This game's own generator, never the engine's shared stream — ADR-0141, and `puzzle/rng.ts` for why. */
@@ -125,32 +126,41 @@ export interface Cartridge {
  *
  * ⚠️ AND `declines` MOVED HERE FROM THE SHELL, WHICH IS AN ERRATUM CORRECTING ME. The cartridge
  * contract listed «whether `declines` is host-owned or game-owned» as open, and this repository
- * answered it wrongly — it sat in `standalone.ts` until engine 9.0.0 shipped `GanchosDoCartucho` with
+ * answered it wrongly — it sat in `standalone.ts` until engine 9.0.0 shipped `CartridgeHooks` with
  * the answer. The record's own erratum says why: ADR-0139 §1 counted fifteen fields out of twenty and
- * left five on the wrong side — `declines`, `getPauseActs`, `setPauseActor`, `setTemaDoJogador` and
- * `setCorrecaoDoJogador`. Its own test settles them: a PAGE cannot say what a GAME does not have.
+ * left five on the wrong side — `declines`, `getPauseActs`, `setPauseActor`, `setPlayerTheme` and
+ * `setPlayerCorrection`. Its own test settles them: a PAGE cannot say what a GAME does not have.
  *
  * 📌 The type is now the ENGINE's, not a local shape. A local interface with two members was a second
  * place for this list to drift, and it had already drifted once.
  */
-export type CartridgeHooks = GanchosDoCartucho;
+// Re-exported from the engine for consumers of this cartridge module.
+export type { CartridgeHooks } from '@the-inclusionist/engine';
 
 /** The narrow slice of the engine this game actually uses. Typed here so the cartridge does not
  *  depend on the whole `Engine` shape while the contract is still moving. */
 interface EngineLike {
   readonly problems: readonly string[];
-  readonly pausa: { mostrar(i: number): void; esconder(i: number): void };
+  readonly pause: { show(i: number): void; hide(i: number): void };
   readonly keyboard: { actionOf(code: string, player: number): string | null };
-  readonly cenas: {
+  readonly scenes: {
     push(s: unknown): void; replace(s: unknown): void; pop(): void;
-    top(): { nome: string } | null;
+    top(): { name: string } | null;
   };
   readonly nav: { attach(): void; sharedDialogOpen(): unknown };
-  aplicarFiltroDeVisao(filter: string | null, alcance: unknown): void;
+  applyVisionFilter(filter: string | null, alcance: unknown): void;
 }
 
 const SLUG = 'game-15puzzle';
-const key = (name: string): string => store.kJogo('15puzzle', name);
+
+/**
+ * ⚠️ MODULE-LEVEL IS JUST A HELPER THAT WRITES A STRING. ADR-0139 §5's rule — nothing module-scope
+ * holds state — is about the state itself, and `gameKey('15puzzle', 'size')` is a pure call: it
+ * returns `'incl.15puzzle.size'` and reads nothing. The STORE that gets written to is built inside
+ * `create(ctx)` from the host's `localStorage` (or a test's memory backend), and nothing survives a
+ * teardown.
+ */
+const key = (name: string): string => gameKey('15puzzle', name);
 
 /**
  * THE CARTRIDGE IS BUILT BY A FACTORY, AND THAT IS THE FIRST OPEN QUESTION ANSWERED.
@@ -175,6 +185,22 @@ export function createCartridge(): Cartridge {
   let run: Run | null = null;
 
   /**
+   * THE STORE, BUILT ONCE PER FACTORY CALL (ADR-0232). Engine 11 made storage a factory rather than
+   * module-level getters: `createStorage(backend)` returns a `Store` object with `get/set/getBool/…`,
+   * and a `null` backend is a host with no storage worth writing to — every write reports `false`,
+   * every read returns its fallback.
+   *
+   * ⚠️ `globalThis.localStorage` RATHER THAN `window.localStorage`, so a Node test that imports this
+   * module reaches the same door through its own `memoryBackend` without going through a global
+   * `window`.
+   */
+  const backend = typeof globalThis !== 'undefined'
+    && typeof (globalThis as { localStorage?: Storage }).localStorage !== 'undefined'
+    ? (globalThis as { localStorage: Storage }).localStorage
+    : null;
+  const store = createStorage(backend);
+
+  /**
    * THE CHILD'S VISUAL STATE, AND THE ENGINE IS ITS OWNER NOW.
    *
    * ⚠️ THIS IS THE «MENUS, ICONS AND THEMES OF THE ENGINE» DECISION, IN ONE POINTER. Until 9.0.0 this
@@ -193,7 +219,7 @@ export function createCartridge(): Cartridge {
    * game's: ADR-0038 puts the profile at PAGE lifetime, so it has to survive a mount/unmount cycle.
    * `run` above is the opposite case and that is why they are two pointers rather than one object.
    */
-  let visual: VisualState = PADRAO;
+  let visual: VisualState = DEFAULT_VISUAL;
   let repaint: ((v: VisualState) => void) | null = null;
   let pauseActs: Record<string, (() => void) | undefined> = {};
 
@@ -231,9 +257,17 @@ export function createCartridge(): Cartridge {
     dicts: catalogs,
 
     hooks: {
-      // No gamepad wizard and no pause actor. Declared rather than deduced from a getter returning
-      // null — and `semMenuDePausa` no longer exists at all: ADR-0120 made the pause undeclinable.
-      declines: { semAssistenteDePad: true, semAtorDePausa: true },
+      // No pause actor. Declared rather than deduced from a getter returning null.
+      //
+      // ⚠️ `semAssistenteDePad` IS GONE IN ENGINE 11 — the pad wizard became unconditional, and the
+      // key was removed from `Declinios` without a replacement. The record this cartridge rode on
+      // («assume uncondicional and keep going») is written in the engine now; the game has no
+      // sentence to say about it. `semMenuDePausa` had already gone with ADR-0120.
+      //
+      // ⚠️ `semVozNeural` IS NOT WRITTEN HERE either (would be `noNeuralVoice` in 11.0.0). Whether
+      // the neural voice loads is the DECISION OF `uses: { neuralVoice }` on the shell's createGame
+      // (step 11f), not of a decline here.
+      declines: { noPauseActor: true },
       isNavigable: () => true,
 
       /**
@@ -245,8 +279,8 @@ export function createCartridge(): Cartridge {
        *
        * The player index is ignored: this game seats one.
        */
-      setTemaDoJogador: (_i, tema) => { visual = { ...visual, tema }; repaint?.(visual); },
-      setCorrecaoDoJogador: (_i, correcao) => { visual = { ...visual, correcao }; repaint?.(visual); },
+      setPlayerTheme: (_i, tema) => { visual = { ...visual, tema }; repaint?.(visual); },
+      setPlayerCorrection: (_i, correcao) => { visual = { ...visual, correcao }; repaint?.(visual); },
 
       /**
        * ⚠️ AND THIS ONE IS NOT A FEATURE, IT IS A DEFECT BEING CLOSED. Without a table, `acts.resume`
@@ -261,15 +295,11 @@ export function createCartridge(): Cartridge {
        * that started first.
        */
       getPauseActs: () => pauseActs,
-      // The sonar needs to know where the listener stands. On a grid that is the cursor's square, so
-      // the engine can measure to the targets the declaration hands it. It forwards through the same
-      // pointer the declaration does, so before `create` it describes the placeholder and after
-      // `teardown` it describes nothing — which is the honest answer in both cases.
-      sonarPlayers: () => {
-        const r = run;
-        if (!r) return [];
-        return [{ i: 0, x: r.cursor() % r.size, y: Math.floor(r.cursor() / r.size), viz: 'normal' }];
-      },
+      // ⚠️ `sonarPlayers` LEFT `CartridgeHooks` IN ENGINE 11, and the removal is a feature. The engine
+      // derives the listener's position from the DECLARATION now — `topology`, `targetsOf`, `nameAt`,
+      // `focusOf` — because every one of those answers was already in the declaration anyway, and
+      // asking the hooks for a redundant projection of them was two sources of truth. The sonar does
+      // the measuring from the one source it already reads.
     },
 
     create(ctx: GameCtx): GameInstance {
@@ -290,11 +320,11 @@ export function createCartridge(): Cartridge {
       // not an arrow: what a player needs to know is WHICH TILES she is about to shift.
       let hint: readonly number[] = [];
 
-      // ⚠️ READ FROM THE ENGINE, NOT FROM THIS GAME'S OWN KEYS. `lerVisualGuardado` also MIGRATES a
+      // ⚠️ READ FROM THE ENGINE, NOT FROM THIS GAME'S OWN KEYS. `readStoredVisual` also MIGRATES a
       // profile saved before the two axes existed, which is the difference between migrating a child's
       // setting and silently resetting it — and whoever chose `fix-deuter` chose it because she sees
       // that way.
-      visual = lerVisualGuardado(0);
+      visual = readStoredVisual(store, 0);
       let highContrast = visual.tema !== 'padrao';
       const systemReduced = win.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
       let reducedMotion = store.getBool(key('motion'), systemReduced);
@@ -313,7 +343,10 @@ export function createCartridge(): Cartridge {
        * checkbox cannot turn motion back ON while calm is asked for, because whoever asked for calm
        * asked for it whole.
        */
-      const motionReduced = (): boolean => reducedMotion || lerCenaGuardada().items === true;
+      // ⚠️ `readStoredScene` NOW TAKES TWO ARGS in engine 11 (ADR-0232 D2c): the store built above and
+      // the system's default. Called per slide — not per frame — so the store read stays cheap.
+      const motionReduced = (): boolean =>
+        reducedMotion || readStoredScene(store, systemReduced).items === true;
 
       // The engine writes the value and calls this; the game repaints. ADR-0106's division, and the
       // reason the cartridge needs no settings screen of its own for either axis.
@@ -333,10 +366,10 @@ export function createCartridge(): Cartridge {
        * her an item that does not exist.
        */
       pauseActs = {
-        resume: () => engine.pausa.esconder(0),
+        resume: () => engine.pause.hide(0),
         // The engine's own menu carries it too, so the day the card gains an opener this is already
         // the route — and the HUD button beside it is the bridge until then, not a second design.
-        empatia: () => { engine.pausa.esconder(0); empathy.show(); },
+        empatia: () => { engine.pause.hide(0); empathy.show(); },
       };
 
       /* ===================== THE TWO BOXES THIS GAME NEEDS, BOTH ITS OWN =====================
@@ -408,7 +441,7 @@ export function createCartridge(): Cartridge {
       const slide = createSlide({ reduced: motionReduced });
       const view = createBoardView({
         layer: surface.layer,
-        criarDesenho: surface.criarDesenho,
+        createDrawing: surface.createDrawing,
         geometry,
         palette: highContrast ? HIGH : NORMAL,
       });
@@ -464,23 +497,22 @@ export function createCartridge(): Cartridge {
       });
       world.appendChild(titleScreen.root);
 
-      const cenaJogo = { nome: 'playing' };
-      const cenaTitulo = {
-        nome: 'title',
+      const cenaJogo = { name: 'playing' };
+      const cenaTitulo = { name: 'title',
         enter: () => { titleScreen.show(); grid.setInert(true); },
         exit: () => { titleScreen.hide(); grid.setInert(false); },
       };
 
       function start(): void {
-        if (engine.cenas.top()?.nome !== 'title') return;
-        engine.cenas.replace(cenaJogo);
+        if (engine.scenes.top()?.name !== 'title') return;
+        engine.scenes.replace(cenaJogo);
         grid.focusCursor();
         // The board has just arrived and she cannot see it. One sentence, the same one the grid
         // carries as its own label — said once here because nothing else announces an arrival.
         srSay(`${i18n.t('a11y.boardLabel', { size: (run as Run).size })}. ${i18n.t('a11y.gridHint')}`);
       }
 
-      function playing(): boolean { return engine.cenas.top()?.nome === 'playing'; }
+      function playing(): boolean { return engine.scenes.top()?.name === 'playing'; }
 
       function applyLook(): void {
         const palette = highContrast ? HIGH : NORMAL;
@@ -498,13 +530,13 @@ export function createCartridge(): Cartridge {
          * vocabulary is the engine's: `tricro` is a NAME for trichromatic vision and not an absence,
          * so it is the one correction that resolves to no filter at all.
          *
-         * The game declares which element is the world and `aplicarFiltroDeVisao` puts the filter
+         * The game declares which element is the world and `applyVisionFilter` puts the filter
          * there, so the reach rule stays in one place — and `#world` is a filter boundary precisely so
          * the panel and the borrowed bar stay legible under a simulation.
          */
         /**
          * ⚠️ SIMULATION WINS OVER CORRECTION, and it is not a hidden precedence rule: the two cannot
-         * coexist, and `simulacaoIndisponivel` is what keeps them apart — the panel refuses to offer a
+         * coexist, and `simulationUnavailable` is what keeps them apart — the panel refuses to offer a
          * simulation while an adaptation is on, and says why. This `??` only ever fires for a state
          * nobody could build through the interface.
          */
@@ -514,7 +546,7 @@ export function createCartridge(): Cartridge {
         // attribute = no overlay, which is every other mode including `blind`.
         const lv = VIZ_MODES.find((m) => m.key === mode)?.lv;
         if (lv) lvOverlay.dataset.lv = lv; else delete lvOverlay.dataset.lv;
-        engine.aplicarFiltroDeVisao(visionFilter(mode), alcanceDoModo(mode));
+        engine.applyVisionFilter(visionFilter(mode), reachOfMode(mode));
       }
 
       function newRun(next: Size, nextSeed: number, announcement: string): void {
@@ -583,7 +615,7 @@ export function createCartridge(): Cartridge {
       });
 
       applyLook();
-      engine.cenas.push(cenaTitulo);
+      engine.scenes.push(cenaTitulo);
 
       let dialogWasOpen = false;
       let frames = 0;
@@ -615,7 +647,7 @@ export function createCartridge(): Cartridge {
           stopI18n();
           slide.cancel();
           // ⚠️ THE POINTERS GO FIRST. Both are read by the engine through the cartridge's hooks, which
-          // outlive this instance: a `setTemaDoJogador` arriving after teardown would repaint a board
+          // outlive this instance: a `setPlayerTheme` arriving after teardown would repaint a board
           // that no longer exists, and a pause item would call into a torn-down closure. The visual
           // STATE stays — it is the child's, not the game's (ADR-0038).
           repaint = null;
@@ -628,7 +660,7 @@ export function createCartridge(): Cartridge {
           // — so popping after `destroy()` would call a method on a component that has already let
           // go of its DOM. ADR-0142 §3 makes the same point from the engine's side: a `clear()` that
           // skipped `exit()` would be the wrong fix, because `exit()` is where the cleanup lives.
-          while (engine.cenas.top()) engine.cenas.pop();
+          while (engine.scenes.top()) engine.scenes.pop();
           titleScreen.destroy();
           empathy.destroy();
           grid.destroy();

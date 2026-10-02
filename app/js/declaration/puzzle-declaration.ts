@@ -144,7 +144,7 @@ export function createPuzzleDeclaration(deps: DeclarationDeps): GameDeclaration 
      * changes nothing. Offering it would be worse than not having it: a child with a motor
      * difficulty would spend the one affordance she was looking for on a control that does nothing.
      */
-    seguraTeclas(): boolean {
+    holdsKeys(): boolean {
       return false;
     },
 

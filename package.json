@@ -29,7 +29,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.10.0",
     "@mintplex-labs/piper-tts-web": "1.0.4",
-    "@the-inclusionist/engine": "9.0.0",
+    "@the-inclusionist/engine": "11.0.0",
     "@types/node": "^22.0.0",
     "@vitest/browser": "^4.0.0",
     "@vitest/browser-playwright": "^4.0.0",

@@ -125,8 +125,8 @@ export function createHud(deps: HudDeps): Hud {
    *
    * 📌 The select was also ONE field carrying two axes plus the simulations, which is the shape
    * ADR-0104 split and ADR-0011's supersession forbids: a child with colour blindness may need high
-   * contrast AT THE SAME TIME, and one value cannot hold both. `setTemaDoJogador` and
-   * `setCorrecaoDoJogador` are two fields because they are two questions.
+   * contrast AT THE SAME TIME, and one value cannot hold both. `setPlayerTheme` and
+   * `setPlayerCorrection` are two fields because they are two questions.
    */
 
   const motionRow = el('span', 'hud-check');

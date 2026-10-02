@@ -109,7 +109,7 @@ describe('the engine accepts it', () => {
   // one. A switch that changes nothing is worse than an absent switch for the child who went looking
   // for it.
   it('declares that it holds no key down', () => {
-    for (const n of [3, 4, 5]) expect(harness(n).declaration.seguraTeclas(), `size ${n}`).toBe(false);
+    for (const n of [3, 4, 5]) expect(harness(n).declaration.holdsKeys(), `size ${n}`).toBe(false);
   });
 
   it('needs no pointer, and says nothing rather than saying so', () => {
