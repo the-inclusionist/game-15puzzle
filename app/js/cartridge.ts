@@ -46,7 +46,7 @@ import type { Solver } from './puzzle/solver.ts';
 import type { GameDeclaration } from '@the-inclusionist/engine/core/contract.js';
 // ⚠️ THE BARE SPECIFIER, not a `boot/…` subpath: the engine's export map routes `.` to
 // `dist-pkg/boot/create-game` and publishes no `./boot/*` pattern at all.
-import type { CartridgeHooks } from '@the-inclusionist/engine';
+import type { CartridgeHooks, VirtualCommand } from '@the-inclusionist/engine';
 import type { VisualState } from '@the-inclusionist/engine/render/viz-axes.js';
 
 /** This game's own generator, never the engine's shared stream — ADR-0141, and `puzzle/rng.ts` for why. */
@@ -226,6 +226,21 @@ export function createCartridge(): Cartridge {
   let repaint: ((v: VisualState) => void) | null = null;
   let pauseActs: Record<string, (() => void) | undefined> = {};
 
+  /**
+   * THE VIRTUAL CONTROLLER DISPATCH, LATE-BOUND (ADR-0111 §1, built in engine 11).
+   *
+   * The engine delivers one `VirtualCommand` per press and one per release of EVERY transport —
+   * keyboard, pad, touch, eyes, face, hands, voice, scan — through the hook below. Before `create`
+   * runs the grid does not exist, so the hook is a no-op until `create` installs the real dispatcher.
+   * `teardown` restores the no-op.
+   *
+   * ⚠️ ONE PATH FOR EVERY TRANSPORT. The grid used to own a `keydown` listener; it does not now.
+   * `up`/`down`/`left`/`right` go to `grid.move(dir)`, `action1` goes to `grid.activate()`. The
+   * engine's own listeners handle `start`/`select` and swallow them before `onCommand` fires, which
+   * means a key that opens the pause card never reaches here.
+   */
+  let onCommandDispatch: (cmd: VirtualCommand) => void = () => { /* no cartridge instance yet */ };
+
   const savedSize = Number(store.get(key('size'), '4'));
   const startSize: Size = (SIZES as readonly number[]).includes(savedSize) ? (savedSize as Size) : 4;
 
@@ -329,6 +344,9 @@ export function createCartridge(): Cartridge {
         right: { labelKey: 'preset.right.label' },
         action1: { labelKey: 'preset.action1.label', hintKey: 'preset.action1.hint' },
       },
+
+      /** The virtual controller's hook. Delegates to the dispatcher built inside `create(ctx)`. */
+      onCommand: (cmd) => onCommandDispatch(cmd),
       isNavigable: () => true,
 
       /**
@@ -523,10 +541,34 @@ export function createCartridge(): Cartridge {
         i18n,
         run: () => run as Run,
         geometry: () => geometry,
-        actionOf: (code) => engine.keyboard.actionOf(code, 0),
         onActivate: (index) => activate(index),
       });
       world.appendChild(grid.root);
+
+      /**
+       * HOOK UP THE VIRTUAL CONTROLLER. Press edge only — the engine delivers a `pressed: false`
+       * release right after, which this game ignores (every input is a discrete press, and the
+       * declaration's `holdsKeys(): false` says so). While the title screen is up or a menu dialog
+       * has the directional, `onCommand` is not called by the engine at all — so this handler can
+       * assume play is on.
+       */
+      onCommandDispatch = (cmd) => {
+        if (!cmd.pressed) return;
+        if (cmd.player !== 0) return;
+        switch (cmd.action) {
+          case 'up':
+          case 'down':
+          case 'left':
+          case 'right':
+            grid.move(cmd.action);
+            return;
+          case 'action1':
+            grid.activate();
+            return;
+          default:
+            return;
+        }
+      };
 
       const hud = createHud({
         doc,
@@ -724,6 +766,7 @@ export function createCartridge(): Cartridge {
           // STATE stays — it is the child's, not the game's (ADR-0038).
           repaint = null;
           pauseActs = {};
+          onCommandDispatch = () => { /* unmounted */ };
           // ⚠️ THE BORROWED BAR GOES BACK FIRST, before anything is removed. It is the host's, it
           // outlives this cartridge, and it is inside a column that is about to stop existing.
           if (a11yBar && barHome) barHome.appendChild(a11yBar);

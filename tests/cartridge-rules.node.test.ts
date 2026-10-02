@@ -74,16 +74,28 @@ describe('the rules a standalone build cannot enforce for itself', () => {
   });
 
   /**
-   * ⚠️ ADR-0139's SECOND GATE, WORD FOR WORD: «grep for `createGame` inside a cartridge's own source
-   * returns nothing». And two more of the same family, because they are the same rule about who owns
-   * the page: `startLoop` (six cartridges each opening a frame callback is six loops fighting over
-   * one frame) and `location` (one address serves every cartridge, so reading the query string reads
-   * another game's parameters — and this game takes `?seed=`).
+   * ⚠️ ADR-0111 §1, in test form. «A cartridge does not import `input/state`, does not call `held()`,
+   * does not see key codes, pad indices or touch points. The engine wires every transport onto the
+   * controller; the cartridge only ever meets the controller.»
    *
-   * The SHELL is exempt and named rather than excluded by pattern: it is the file whose entire job is
-   * to be the page, so a rule that hid it by wildcard would hide the next file that drifted into
-   * doing the same thing.
+   * Engine 11 made this enforceable by publishing `onCommand(VirtualCommand)`. The grid used to read
+   * `event.code` and `event.key` because `onCommand` did not exist; it does now, so the game stops
+   * being a transport. Any `KeyboardEvent` property or `addEventListener('keydown'…)` outside this
+   * test file is a regression — a cartridge the engine's remap, scan or gamepad conductor cannot
+   * reach.
+   *
+   * Both tests below EXEMPT the test tree, because tests legitimately dispatch synthetic events to
+   * assert that the production code DOES NOT RESPOND to them (see
+   * `tests/tile-grid.browser.test.ts`'s «does not read keys any more»).
    */
+  it('reads no keys any more (ADR-0111 §1)', () => {
+    const forbidden = [/\bevent\.code\b/, /\bevent\.key\b/, /\baddEventListener\(\s*['"]keydown['"]/];
+    const offenders = files
+      .map(({ path, src }) => ({ path, hits: forbidden.filter((re) => re.test(src)).map(String) }))
+      .filter((f) => f.hits.length > 0);
+    expect(offenders.map((f) => `${f.path}: ${f.hits.join(' ')}`), 'these read keys').toEqual([]);
+  });
+
   it('leaves the page to the shell — no createGame, no startLoop, no location', () => {
     const shell = join(SRC, 'boot', 'standalone.ts');
     const offenders = files

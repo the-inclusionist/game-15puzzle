@@ -111,17 +111,19 @@ describe('the accessibility tree', () => {
   });
 });
 
-describe('the keyboard', () => {
-  const press = (grid: TileGrid, key: string, init: KeyboardEventInit = {}): void => {
-    grid.root.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true, ...init }));
-  };
-
-  it('moves the cursor with the arrows', () => {
+// ⚠️ THESE TESTS DROVE A `keydown` LISTENER UNTIL ENGINE 11, and that listener is gone (ADR-0111 §1:
+// a cartridge does not read keys). The engine's virtual controller delivers commands through
+// `onCommand(VirtualCommand)`, and the cartridge calls `grid.move(dir)` or `grid.activate()` on this
+// imperative API. What this describe block tests NOW is that imperative API — the one the cartridge's
+// dispatcher calls — not the keyboard, which is the engine's business and lives in the engine's own
+// test suite.
+describe('the imperative cursor API', () => {
+  it('moves the cursor with move(dir)', () => {
     const m = mount(4);
-    press(m.grid, 'ArrowRight'); expect(m.run().cursor()).toBe(1);
-    press(m.grid, 'ArrowDown'); expect(m.run().cursor()).toBe(5);
-    press(m.grid, 'ArrowLeft'); expect(m.run().cursor()).toBe(4);
-    press(m.grid, 'ArrowUp'); expect(m.run().cursor()).toBe(0);
+    m.grid.move('right'); expect(m.run().cursor()).toBe(1);
+    m.grid.move('down'); expect(m.run().cursor()).toBe(5);
+    m.grid.move('left'); expect(m.run().cursor()).toBe(4);
+    m.grid.move('up'); expect(m.run().cursor()).toBe(0);
   });
 
   // Clamped, never wrapped. A cursor that reappeared on the far side would tell a blind player the
@@ -129,63 +131,40 @@ describe('the keyboard', () => {
   // never a two-dimensional grid.
   it('clamps at the edges instead of wrapping', () => {
     const m = mount(4);
-    press(m.grid, 'ArrowUp'); press(m.grid, 'ArrowLeft');
+    m.grid.move('up'); m.grid.move('left');
     expect(m.run().cursor()).toBe(0);
-    for (let i = 0; i < 6; i++) { press(m.grid, 'ArrowRight'); press(m.grid, 'ArrowDown'); }
+    for (let i = 0; i < 6; i++) { m.grid.move('right'); m.grid.move('down'); }
     expect(m.run().cursor()).toBe(15);
-  });
-
-  it('takes Home and End across the row, and Ctrl across the board', () => {
-    const m = mount(4);
-    press(m.grid, 'ArrowDown'); press(m.grid, 'ArrowRight');   // row 1, column 1
-    press(m.grid, 'End'); expect(m.run().cursor()).toBe(7);
-    press(m.grid, 'Home'); expect(m.run().cursor()).toBe(4);
-    press(m.grid, 'End', { ctrlKey: true }); expect(m.run().cursor()).toBe(15);
-    press(m.grid, 'Home', { ctrlKey: true }); expect(m.run().cursor()).toBe(0);
   });
 
   it('moves focus with the cursor, so a sighted keyboard player can see where they are', () => {
     const m = mount(4);
     m.cells()[0].focus();
-    press(m.grid, 'ArrowRight');
+    m.grid.move('right');
     expect(document.activeElement).toBe(m.cells()[1]);
   });
 
-  // The one funnel. A click, an Enter and a Space are three routes to `run.activate`, and nothing
-  // else reaches it — which is what stops keyboard and pointer drifting apart.
-  it('activates through the same door for a click, Enter and Space', () => {
+  // The one funnel. The native button click (pointer, touch, Enter and Space on the focused button)
+  // and `grid.activate()` (from `onCommand({action:'action1'})`) both call the same `onActivate`.
+  // Nothing else reaches it, which is what stops keyboard and pointer drifting apart.
+  it('activates through the same door for a click and for grid.activate()', () => {
     const m = mount(4, solved(4));
     m.cells()[14].click();
     expect(m.activated).toEqual([14]);
-    // Enter and Space are the BUTTON's own behaviour, not ours: the platform turns them into clicks.
-    m.cells()[15].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
-    expect(m.activated).toEqual([14]);   // no second path invented for it
+    m.grid.activate();
+    // activate() uses the current cursor — this test mounts with cursor at 0, so a second entry
+    // reaches 0. What is asserted is that the SAME onActivate fires for both routes.
+    expect(m.activated.length).toBe(2);
   });
 
-  it('leaves keys it does not own alone', () => {
+  // ⚠️ ADR-0111 §1 in test form. The grid stopped being a transport in engine 11; a `keydown`
+  // listener here would be reading keys the engine was supposed to own. Measured by dispatching a key
+  // and asserting the cursor did not move — nothing is listening.
+  it('does not read keys any more', () => {
     const m = mount(4);
-    const event = new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', bubbles: true, cancelable: true });
-    m.grid.root.dispatchEvent(event);
-    expect(event.defaultPrevented).toBe(false);
-  });
-
-  it('asks the engine\'s remap before falling back to the literal arrow', () => {
-    const region = document.createElement('div');
-    region.id = 'game-region';
-    region.style.cssText = 'position:relative;width:640px;height:360px';
-    document.body.appendChild(region);
-    let run: Run = createRun({ size: 4, seed: 9, solver, board: solved(4) });
-    // A child who remapped her directions in another Inclusionist game finds them here. A hardcoded
-    // `ArrowUp` would never give her that.
-    const grid = createTileGrid({
-      doc: document, i18n, run: () => run, geometry: () => boardGeometry(4),
-      actionOf: (code) => (code === 'KeyD' ? 'right' : null),
-      onActivate: () => {},
-    });
-    region.appendChild(grid.root);
-    mounted = { region, grid };
-    grid.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', code: 'KeyD', bubbles: true }));
-    expect(run.cursor()).toBe(1);
+    const before = m.run().cursor();
+    m.grid.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true }));
+    expect(m.run().cursor()).toBe(before);
   });
 });
 

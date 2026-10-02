@@ -50,31 +50,27 @@ import type { Run } from '../puzzle/run.ts';
 import type { I18n } from '../i18n/index.ts';
 import { describeCell } from '../declaration/puzzle-declaration.ts';
 
-/** Arrow keys as a last resort. The engine's remap is asked first — see `navigation` below. */
-const FALLBACK: Readonly<Record<string, 'up' | 'down' | 'left' | 'right'>> = {
-  ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-};
-
 export interface TileGridDeps {
   readonly doc: Document;
   readonly i18n: I18n;
   /** The CURRENT run. A getter: a size change replaces the object. */
   run(): Run;
   geometry(): BoardGeometry;
-  /**
-   * Which intent a physical key carries, for player 0 — the engine's remap (ADR-0033).
-   *
-   * Optional so the grid can be tested without an engine, and so a host that declines the keyboard
-   * runtime still navigates. A child who remapped her directions in another Inclusionist game finds
-   * them here, which a hardcoded `ArrowUp` would never give her.
-   */
-  actionOf?(code: string): string | null;
   /** Called when a cell is activated, by any route. */
   onActivate(index: number): void;
 }
 
 export interface TileGrid {
   readonly root: HTMLElement;
+  /**
+   * MOVE THE CURSOR ONE STEP, called by whoever delivers input — in production the cartridge's
+   * `onCommand(VirtualCommand)` dispatcher (ADR-0111 §1: the cartridge never reads keys). Clamped
+   * at the edges, never wrapped — a sliding puzzle has corners, and a cursor reappearing on the far
+   * side would tell a blind player the board is a torus.
+   */
+  move(dir: 'up' | 'down' | 'left' | 'right'): void;
+  /** Activate the tile under the current cursor, as a native click would. */
+  activate(): void;
   /** Rebuild labels, states and numbers from the run. Cheap: it writes, it does not recreate. */
   refresh(): void;
   /** Rebuild the whole grid — a new board size, or a language change. */
@@ -108,14 +104,27 @@ export function createTileGrid(deps: TileGridDeps): TileGrid {
 
   const cellAt = (index: number): HTMLButtonElement | undefined => cells[index];
 
-  /** The one door in. A click, an Enter and a Space all arrive here. */
+  /** The one door in. A click, a native Enter/Space on a focused button, and `onCommand(action1)`
+   *  from any transport all arrive here. */
   const activate = (index: number): void => { deps.onActivate(index); };
 
-  const navigation = (event: KeyboardEvent): 'up' | 'down' | 'left' | 'right' | null => {
-    const intent = deps.actionOf?.(event.code) ?? null;
-    if (intent === 'up' || intent === 'down' || intent === 'left' || intent === 'right') return intent;
-    return FALLBACK[event.key] ?? null;
-  };
+  /**
+   * Move the cursor by one in one direction, clamped. Called from `onCommand({action: 'up'|…})`
+   * delivered by the virtual controller — no key reading here (ADR-0111 §1).
+   */
+  function moveCursor(dir: 'up' | 'down' | 'left' | 'right'): void {
+    const run = deps.run();
+    const n = run.size;
+    const cursor = run.cursor();
+    const x = cursor % n; const y = Math.floor(cursor / n);
+    const nx = Math.min(n - 1, Math.max(0, x + (dir === 'left' ? -1 : dir === 'right' ? 1 : 0)));
+    const ny = Math.min(n - 1, Math.max(0, y + (dir === 'up' ? -1 : dir === 'down' ? 1 : 0)));
+    const target = ny * n + nx;
+    if (target === cursor) return;
+    run.setCursor(target);
+    refresh();
+    cellAt(target)?.focus();
+  }
 
   function build(): void {
     const g = deps.geometry();
@@ -188,42 +197,22 @@ export function createTileGrid(deps: TileGridDeps): TileGrid {
     activate(Number(cell.dataset.index));
   };
 
-  const onKeyDown = (event: KeyboardEvent): void => {
-    const run = deps.run();
-    const n = run.size;
-    const cursor = run.cursor();
-    const x = cursor % n; const y = Math.floor(cursor / n);
-
-    // Home/End first: they are not directions, and Ctrl widens them from the row to the board.
-    if (event.key === 'Home' || event.key === 'End') {
-      const last = n * n - 1;
-      const target = event.ctrlKey
-        ? (event.key === 'Home' ? 0 : last)
-        : (event.key === 'Home' ? y * n : y * n + n - 1);
-      event.preventDefault();
-      run.setCursor(target);
-      refresh();
-      cellAt(target)?.focus();
-      return;
-    }
-
-    const dir = navigation(event);
-    if (!dir) return;                       // Enter and Space are the BUTTON's, natively. Not ours.
-    event.preventDefault();
-    // Clamped, never wrapped. A board has corners, and a cursor that reappeared on the far side
-    // would tell a blind player the board is a torus. (The engine's `core/anel` makes the same
-    // distinction: wrap a linear menu, never a two-dimensional grid.)
-    const nx = Math.min(n - 1, Math.max(0, x + (dir === 'left' ? -1 : dir === 'right' ? 1 : 0)));
-    const ny = Math.min(n - 1, Math.max(0, y + (dir === 'up' ? -1 : dir === 'down' ? 1 : 0)));
-    const target = ny * n + nx;
-    if (target === cursor) return;
-    run.setCursor(target);
-    refresh();
-    cellAt(target)?.focus();
-  };
-
+  /**
+   * ⚠️ NO `keydown` LISTENER (ADR-0111). The grid read keys as a transport in engine 8–10 because
+   * `onCommand` did not exist. In 11.0.0 the engine delivers `VirtualCommand`s from EVERY transport —
+   * keyboard, pad, touch, eyes, voice, scan — through one callback the cartridge passes to
+   * `createGame`. The grid stopped being a transport; it became the receiver.
+   *
+   * The native `click` handler stays: it answers pointer and touch, AND it is what Enter/Space on a
+   * focused `<button>` fire. The engine's `keyboardMapping` of ADR-0115 moves Enter OFF the engine's
+   * `start` position (its default) so Enter no longer opens the pause card for a child whose focus
+   * is on a tile — the native button activation is the one that fires.
+   *
+   * Home/End are not supported here. The engine's keyboard runtime has no concept for them, and
+   * reading them locally would reintroduce exactly the key coupling ADR-0111 forbids. A cursor can
+   * reach a corner with repeated arrow presses.
+   */
   root.addEventListener('click', onClick);
-  root.addEventListener('keydown', onKeyDown);
   build();
 
   return {
@@ -266,9 +255,11 @@ export function createTileGrid(deps: TileGridDeps): TileGrid {
       else root.removeAttribute('inert');
     },
 
+    move: moveCursor,
+    activate: () => activate(deps.run().cursor()),
+
     destroy() {
       root.removeEventListener('click', onClick);
-      root.removeEventListener('keydown', onKeyDown);
       root.remove();
     },
   };

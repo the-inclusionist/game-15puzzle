@@ -49,6 +49,7 @@
 import type {
   Focus, GameDeclaration, Heading, Objective, Role, Speakable, Spot, Topology, WorldScope,
 } from '@the-inclusionist/engine/core/contract.js';
+import type { Action } from '@the-inclusionist/engine/core/actions.js';
 import { homeOf, pushOf, pushableFrom } from '../puzzle/board.ts';
 import { inBounds, indexOf, spotOf } from '../puzzle/types.ts';
 import type { Direction } from '../puzzle/types.ts';
@@ -146,6 +147,31 @@ export function createPuzzleDeclaration(deps: DeclarationDeps): GameDeclaration 
      */
     holdsKeys(): boolean {
       return false;
+    },
+
+    /**
+     * THIS GAME'S DEFAULT KEYBOARD MAPPING, by player count and seat (ADR-0115). The precedence is
+     * engine factory → GAME → child's remap. One seat here, so the mapping is identical for both
+     * arguments; the signature stays because the engine calls it the same way for every seat count.
+     *
+     * ⚠️ THE REASON IT EXISTS IS A COLLISION. The engine's default `start → ['KeyH', 'Enter']` opens
+     * the pause card from Enter — but the tiles are `<button role="gridcell">`, and Enter on a
+     * focused button is native activation. Both fire, so Enter would try to slide the tile AND open
+     * the pause card at once. This mapping removes Enter from `start`, keeping `KeyH` as the single
+     * key for opening pause. Space is pulled out of `action2` for the same reason (the engine's
+     * default `action2 → ['KeyJ', 'Space']` would make Space trigger an unused `action2` while also
+     * activating the focused button).
+     *
+     * Everything else uses the engine's own defaults (`core/default-bindings`), which is the right
+     * answer per ADR-0074 and ADR-0115: the arrows and WASD go to `up/down/left/right`, KeyU to
+     * `action1`, KeyK to `action3` (hint, step 11e), KeyI to `action4` (shuffle, step 11e), KeyF to
+     * `select` (opens the pause card and takes focus to the accessibility bar).
+     */
+    keyboardMapping(_players: number, _seat: number): Partial<Record<Action, readonly string[] | null>> {
+      return {
+        start: ['KeyH'],
+        action2: ['KeyJ'],
+      };
     },
 
     // Where the "no timer" decision LIVES: not merely absent, DECLARED. WCAG 2.2.1 (Timing
