@@ -43,8 +43,6 @@ const en: Catalog = {
     'status.solved': 'Solved in {moves} moves',
     'status.crashed': 'The game stopped. Reload the page',
 
-    'hud.moves': 'Moves',
-    'hud.progress': '{have} of {need} in place',
     'hud.size': 'Board size',
     'hud.shuffle': 'Shuffle',
     'hud.hint': 'Show the next moves',
@@ -79,6 +77,28 @@ const en: Catalog = {
     'preset.right.label': 'Right',
     'preset.action1.label': 'Slide',
     'preset.action1.hint': 'Slides the tile under the cursor into the empty square.',
+
+
+    // ---- Engine HUD numbers --------------------------------------------------
+    'hud.moves': 'Moves',
+    'hud.progress': 'Tiles home',
+
+    // ---- action3 (Hint) and action4 (Shuffle) --------------------------------
+    'preset.action3.label': 'Hint',
+    'preset.action3.hint': 'Lights up the next tiles to move.',
+    'preset.action4.label': 'Shuffle',
+    'preset.action4.hint': 'Starts a new round on a scrambled board.',
+
+    // ---- gameOptions ---------------------------------------------------------
+    'game-options.size.label': 'Board size',
+    'game-options.size.hint': 'More tiles teach you to solve in bigger steps.',
+    'game-options.motion.label': 'Reduced motion',
+    'game-options.motion.hint': 'Turns the slide animation off. Tiles teleport.',
+
+    // ---- howToPlay slides ----------------------------------------------------
+    'howto.slide1': 'Slide a tile into the empty square next to it.',
+    'howto.slide2': 'Click a distant tile in the same row or column to push several at once.',
+    'howto.slide3': 'Ask for a hint any time. It shows the next tiles — it does not play them for you.',
 
     'legal.licence': 'Free software under AGPL-3.0-or-later.',
     'legal.source': 'Source code',

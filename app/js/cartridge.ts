@@ -224,6 +224,22 @@ export function createCartridge(): Cartridge {
   let repaint: ((v: VisualState) => void) | null = null;
   let pauseActs: Record<string, (() => void) | undefined> = {};
 
+  const savedSize = Number(store.get(key('size'), '4'));
+  const startSize: Size = (SIZES as readonly number[]).includes(savedSize) ? (savedSize as Size) : 4;
+
+  /**
+   * STATE EXPOSED TO `hud` / `gameOptions`, LATE-BOUND. The arrays are built at factory time (the
+   * engine reads them at `mount`), but their callbacks fire later — some per frame — so each one
+   * reads through a factory-scope pointer that `create(ctx)` updates.
+   *
+   * ⚠️ The ALTERNATIVE is for every callback to carry a `?.` chain against `run` / an installed
+   * writer, which pays the same price in more lines. One pair of pointers per piece of mutable state.
+   */
+  let currentSize: Size = startSize;
+  let currentReducedMotion = store.getBool(key('motion'), false);
+  let writeSize: (n: Size) => void = () => { /* no cartridge instance yet */ };
+  let writeReducedMotion: (on: boolean) => void = () => { /* no cartridge instance yet */ };
+
   /**
    * THE VIRTUAL CONTROLLER DISPATCH, LATE-BOUND (ADR-0111 §1, built in engine 11).
    *
@@ -238,9 +254,6 @@ export function createCartridge(): Cartridge {
    * means a key that opens the pause card never reaches here.
    */
   let onCommandDispatch: (cmd: VirtualCommand) => void = () => { /* no cartridge instance yet */ };
-
-  const savedSize = Number(store.get(key('size'), '4'));
-  const startSize: Size = (SIZES as readonly number[]).includes(savedSize) ? (savedSize as Size) : 4;
 
   /**
    * ⚠️ AND BUILDING IT HERE IS CHEAP, WHICH HAD TO BE CHECKED RATHER THAN ASSUMED. A first draft of
@@ -341,7 +354,84 @@ export function createCartridge(): Cartridge {
         left: { labelKey: 'preset.left.label' },
         right: { labelKey: 'preset.right.label' },
         action1: { labelKey: 'preset.action1.label', hintKey: 'preset.action1.hint' },
+        /**
+         * Hint and Shuffle as ENGINE ACTIONS (ADR-0111, step 11e). Default keys from
+         * `core/default-bindings` are `KeyK` and `KeyI`; the child remaps them in the engine's
+         * remap screen, the switch-scan reaches them with the «Experimentar» word they declare, and
+         * the on-screen pad has buttons for them. The game's HUD stops carrying its own «Dica» and
+         * «Embaralhar» buttons — the discoverability moves to the help card's slides (`howToPlay`).
+         */
+        action3: { labelKey: 'preset.action3.label', hintKey: 'preset.action3.hint' },
+        action4: { labelKey: 'preset.action4.label', hintKey: 'preset.action4.hint' },
       },
+
+      /**
+       * THE TWO NUMBERS THIS GAME SHOWS (ADR-0168, ADR-0175, issue #162). The engine mounts the HUD
+       * on the game's region and places each number in the band it declares — `identity` goes top
+       * left, `mission` just below. `value` is called every frame while mounted, so it stays cheap:
+       * a getter off the current `run` object (which the run factory keeps in O(1) counters).
+       */
+      hud: [
+        { band: 'identity', nameKey: 'hud.moves', value: () => (run ? run.moves() : 0) },
+        {
+          band: 'mission',
+          nameKey: 'hud.progress',
+          value: () => {
+            const r = run;
+            if (!r) return { have: 0, need: 0 };
+            return { have: r.tilesHome(), need: r.size * r.size - 1 };
+          },
+        },
+      ],
+
+      /**
+       * THE TWO OPTIONS THIS GAME HAS, FOR THE «OPÇÕES DO JOGO» CARD ITEM (ADR-0182, issue #178).
+       * Engine 11 draws them with its own rows; the game only names them, reads the current value,
+       * writes the new one. The old HUD panel's size `<select>` and reduced-motion checkbox both go.
+       *
+       * ⚠️ `read` AND `write` ARE CLOSURES OVER THE CARTRIDGE'S STATE, by design. The engine never
+       * holds the value: a cartridge that is mounted twice at different sizes would collide on a
+       * cached one. Reading through a closure means the engine always asks the current cartridge.
+       */
+      gameOptions: [
+        {
+          id: 'size',
+          labelKey: 'game-options.size.label',
+          hintKey: 'game-options.size.hint',
+          kind: 'list',
+          values: [
+            { value: '3', labelKey: 'size.3' },
+            { value: '4', labelKey: 'size.4' },
+            { value: '5', labelKey: 'size.5' },
+          ],
+          read: () => String(currentSize),
+          write: (v: string) => {
+            const n = Number(v) as Size;
+            if (!(SIZES as readonly number[]).includes(n)) return;
+            writeSize(n);
+          },
+        },
+        {
+          id: 'motion',
+          labelKey: 'game-options.motion.label',
+          hintKey: 'game-options.motion.hint',
+          kind: 'switch',
+          read: () => currentReducedMotion,
+          write: (on: boolean) => writeReducedMotion(on),
+        },
+      ],
+
+      /**
+       * HOW TO PLAY — three slides (ADR-0195, issue #188). Each slide is the KEY of a sentence in
+       * `dictionaries`, resolved at every showing in the page's language. The engine's help card
+       * draws them before the button legend. The figures could be canvas drawings (`figure(surface)`),
+       * but a tile puzzle reads cleanly without them.
+       */
+      howToPlay: [
+        { textKey: 'howto.slide1' },
+        { textKey: 'howto.slide2' },
+        { textKey: 'howto.slide3' },
+      ],
 
       /** The virtual controller's hook. Delegates to the dispatcher built inside `create(ctx)`. */
       onCommand: (cmd) => onCommandDispatch(cmd),
@@ -416,6 +506,18 @@ export function createCartridge(): Cartridge {
       let highContrast = visual.tema !== 'padrao';
       const systemReduced = win.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
       let reducedMotion = store.getBool(key('motion'), systemReduced);
+      // Lift the two values to the factory-scope pointers the hud/gameOptions callbacks read.
+      currentSize = size;
+      currentReducedMotion = reducedMotion;
+      writeSize = (n) => {
+        store.set(key('size'), String(n));
+        newRun(n, Date.now() >>> 0, 'a11y.sizeChanged');
+      };
+      writeReducedMotion = (on) => {
+        reducedMotion = on;
+        currentReducedMotion = on;
+        store.setBool(key('motion'), on);
+      };
 
       /**
        * IS MOTION REDUCED — the OR of this game's switch and the engine's calm level.
@@ -560,21 +662,25 @@ export function createCartridge(): Cartridge {
           case 'action1':
             grid.activate();
             return;
+          case 'action3':
+            showHint();
+            return;
+          case 'action4':
+            newRun(size, Date.now() >>> 0, 'a11y.shuffled');
+            return;
           default:
             return;
         }
       };
 
-      const hud = createHud({
-        doc,
-        i18n,
-        run: () => run as Run,
-        initial: { size, reducedMotion },
-        onShuffle: () => newRun(size, Date.now() >>> 0, 'a11y.shuffled'),
-        onHint: () => showHint(),
-        onSize: (next) => { store.set(key('size'), next); newRun(next, Date.now() >>> 0, 'a11y.sizeChanged'); },
-        onReducedMotion: (on) => { reducedMotion = on; store.setBool(key('motion'), on); },
-      });
+      /**
+       * ⚠️ THE HUD IS THE LICENCE OFFER ONLY (step 11e). Moves/progress numbers are declared on
+       * `createGame({ hud: [...] })` and drawn by the engine's HUD bands; size and reduced-motion are
+       * on `gameOptions`; shuffle and hint are `action4` and `action3` of the preset. Vision and
+       * contrast have been the bar's since engine 9. All the panel carries now is the AGPL §13
+       * source link — the one obligation that belongs at the edge of the running game.
+       */
+      const hud = createHud({ doc, i18n });
       side.appendChild(hud.root);
 
       /**
@@ -658,13 +764,13 @@ export function createCartridge(): Cartridge {
         slide.cancel();
         hint = [];
         size = next;
+        currentSize = next;        // keep the factory pointer the engine's hud/gameOptions read
         seed = nextSeed;
         geometry = boardGeometry(size);
         run = createRun({ size, seed, solver, board: shuffle(size, ctx.rng(seed)).board });
         view.setGeometry(geometry);
         grid.rebuild();
         grid.setHint([]);
-        hud.refresh();
         srSay(i18n.t(announcement, { size, need: size * size - 1 }));
       }
 
@@ -680,7 +786,6 @@ export function createCartridge(): Cartridge {
         grid.setHint([]);
         slide.begin(result.push, r.size, geometry.cell + geometry.gap);
         grid.refresh();
-        hud.refresh();
 
         // ⚠️ ONE announcement per completed move, never two. `srSay` is `aria-live="polite"`, which
         // QUEUES: splitting the move and the count into two utterances would put the reader a move
@@ -758,6 +863,12 @@ export function createCartridge(): Cartridge {
           repaint = null;
           pauseActs = {};
           onCommandDispatch = () => { /* unmounted */ };
+          // The factory pointers that `hud` / `gameOptions` read go back to inert — a hud mounted
+          // by a second cartridge on the same page would otherwise read the counts of this one.
+          writeSize = () => {};
+          writeReducedMotion = () => {};
+          currentSize = startSize;
+          currentReducedMotion = store.getBool(key('motion'), false);
           // ⚠️ THE BORROWED BAR GOES BACK FIRST, before anything is removed. It is the host's, it
           // outlives this cartridge, and it is inside a column that is about to stop existing.
           if (a11yBar && barHome) barHome.appendChild(a11yBar);

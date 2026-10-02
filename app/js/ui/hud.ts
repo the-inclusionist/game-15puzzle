@@ -1,65 +1,45 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// ui/hud — the panel beside the board, and the licence offer at the bottom of it.
+// ui/hud — the panel beside the board, now only the licence offer at the bottom.
 //
-// ========================= WHY THIS IS DOM AND NOT CANVAS =========================
-// The same argument the chess consumer reached the hard way, and it is worth restating because the
-// obvious answer is wrong: at 320x180 a HUD line is about seven pixels tall. In a framebuffer that
-// is illegible without a bitmap font, it cannot be resized by anyone who needs it larger, and a
-// screen reader cannot see it at all. In the DOM it is text — it scales with `--ui-fs`, it honours
-// the reader's own font size, every control gets a 44 CSS px target from `--tap` without being
-// asked, and it is simply readable.
+// ========================= WHAT USED TO BE HERE =========================
+// A moves counter, a progress line, a shuffle button, a hint button, a size `<select>`, a reduced-
+// motion checkbox and a vision select — about 190 lines. All of it is the ENGINE's now (step 11e):
 //
-// ========================= WHAT ADR-0049 ALLOWS, AND WHAT IT DOES NOT =========================
-// The move counter is fine, and the record says so almost directly: it is THE ROUND'S counter, the
-// one number that resets. Two constraints come with it and both are cheap to violate:
-//   · NO ANIMATION WHEN IT RISES. No pop, no colour flash, no tick sound. There is none here.
-//   · NOTHING RANKS. No best score, no personal record, no par to be measured against, nothing
-//     persisted across rounds. The count is a work log, not a result.
+//   · the two numbers (moves, progress) are declared as `hud: [...]` on `createGame` and drawn in
+//     the engine's own HUD bands (ADR-0168, ADR-0175);
+//   · the size list and reduced-motion toggle are declared as `gameOptions: [...]` and drawn by the
+//     engine's «Opções do jogo» panel (ADR-0182);
+//   · shuffle and hint are `action4` and `action3` of the game's `preset`, reached by the engine's
+//     remap, the on-screen pad and the switch-scan (ADR-0111);
+//   · the vision select and the contrast checkbox have been owned by the bar's 🚥 and 🌗 since
+//     engine 9 (ADR-0104, ADR-0145);
+//   · the empathy opener was deleted in step 11d — the engine mounts its own panel.
 //
-// And the hint is NOT gated, counted or penalised. There is no wrong move in a sliding puzzle —
-// every move is reversible in one keypress — so a lock would have to invent a penalty in order to
-// have something to protect, which is the pattern the record is written against. What 49.e actually
-// forbids is delivering the answer INSTEAD of the reasoning, and that line is kept by the hint
-// SHOWING the next moves and never playing them.
+// ========================= WHY THIS FILE DID NOT DISAPPEAR =========================
+// AGPL section 13. The licence creates an obligation to offer the source TO WHOEVER INTERACTS with
+// the service, and the obligation lives at the edge of the running game. That is what remains:
+// the SOURCE link, offered where a player can act on it. Section 13 is the entire reason this
+// project is AGPL and not GPL (ADR-0064), and `agpl-source-offer.node.test.ts` is the gate.
 //
-// ========================= AGPL SECTION 13 =========================
-// The link at the bottom is the offer the licence creates, as something a player can act on rather
-// than a line in a file nobody opens. Section 13 is the entire reason this project is AGPL and not
-// GPL (ADR-0064), and neither the engine nor the chess consumer ships it today. `agpl-source-offer`
-// is the gate that keeps it here.
+// ⚠️ IT RESOLVES TO A PRIVATE REPOSITORY UNTIL THE «ATO». A limit of the process and not of the
+// implementation; recorded in `docs/LICENSES.md`.
+//
+// `visionFilter(key)` stays exported — the cartridge uses it to turn a mode key into a CSS filter
+// string before handing it to `engine.applyVisionFilter`. It is pure data.
 
 import { VIZ_FILTER } from '@the-inclusionist/engine/render/viz-modes.js';
-import { SIZES } from '../render/geometry.ts';
-import type { Size } from '../render/geometry.ts';
 import type { I18n } from '../i18n/index.ts';
-import type { Run } from '../puzzle/run.ts';
 
-/**
- * The repository this game's source lives in. The AGPL section 13 offer points here.
- *
- * ⚠️ It resolves to a PRIVATE repository until the Município authorises publication (ADR-0066 §3).
- * That is a limit of the process and not of the implementation: the offer is in place and becomes
- * effective on the day of the ato. Recorded in docs/LICENSES.md rather than left as a promise.
- */
 export const SOURCE_URL = 'https://github.com/the-inclusionist/game-15puzzle';
 
 export interface HudDeps {
   readonly doc: Document;
   readonly i18n: I18n;
-  run(): Run;
-  onShuffle(): void;
-  onHint(): void;
-  onSize(size: Size): void;
-  onReducedMotion(on: boolean): void;
-  /** The starting states, so the controls open showing what is actually true. */
-  readonly initial: { size: Size; reducedMotion: boolean };
 }
 
 export interface Hud {
   readonly root: HTMLElement;
-  /** Move count and progress. Called after every move; writes text and nothing else. */
-  refresh(): void;
-  /** Re-label every control. The engine dispatches `i18n:change` and this is the answer to it. */
+  /** Re-label after an `i18n:change`. The licence sentence is the only text here. */
   relabel(): void;
   destroy(): void;
 }
@@ -69,119 +49,38 @@ export function createHud(deps: HudDeps): Hud {
   const root = doc.createElement('div');
   root.className = 'hud';
 
-  const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string): HTMLElementTagNameMap[K] => {
-    const node = doc.createElement(tag);
-    if (cls) node.className = cls;
-    return node;
-  };
-
-  const movesTitle = el('h2');
-  const movesValue = el('p', 'hud-count');
-  const progress = el('p');
-
-  const shuffle = el('button');
-  shuffle.type = 'button';
-  shuffle.addEventListener('click', () => deps.onShuffle());
-
-  const hintButton = el('button');
-  hintButton.type = 'button';
-  hintButton.addEventListener('click', () => deps.onHint());
-
-  const sizeLabel = el('label');
-  const sizeSelect = el('select');
-  sizeSelect.id = 'hud-size';
-  sizeLabel.htmlFor = sizeSelect.id;
-  for (const n of SIZES) {
-    const option = doc.createElement('option');
-    option.value = String(n);
-    sizeSelect.appendChild(option);
-  }
-  sizeSelect.value = String(deps.initial.size);
-  sizeSelect.addEventListener('change', () => deps.onSize(Number(sizeSelect.value) as Size));
-
-  /* ===================== WHAT USED TO BE HERE, AND WHY IT IS NOT =====================
-   *
-   * A vision `<select>` and a high-contrast checkbox lived at this point. They were removed on the
-   * engine 9.0.0 upgrade in favour of the accessibility bar's 🚥 and 🌗 — the Dev's priority, in his
-   * words: use the engine's menus, icons and themes, so the project keeps one visual identity.
-   *
-   * ⚠️ AND KEEPING BOTH WOULD HAVE BEEN WORSE THAN DUPLICATION. These wrote this game's own storage
-   * keys while the bar writes the engine's, so the two would disagree the moment a child touched
-   * either. This game already carries one such split — the TEA icon against the motion checkbox —
-   * and that one is survivable only because an OR can never un-reduce motion. Contrast has no safe
-   * direction to fall in.
-   *
-   * 📌 The select was also ONE field carrying two axes plus the simulations, which is the shape
-   * ADR-0104 split and ADR-0011's supersession forbids: a child with colour blindness may need high
-   * contrast AT THE SAME TIME, and one value cannot hold both. `setPlayerTheme` and
-   * `setPlayerCorrection` are two fields because they are two questions.
-   */
-
-  const motionRow = el('span', 'hud-check');
-  const motionBox = el('input');
-  motionBox.type = 'checkbox';
-  motionBox.id = 'hud-motion';
-  motionBox.checked = deps.initial.reducedMotion;
-  const motionText = el('label');
-  motionText.htmlFor = motionBox.id;
-  motionBox.addEventListener('change', () => deps.onReducedMotion(motionBox.checked));
-  motionRow.append(motionBox, motionText);
-
-
-  const legal = el('p', 'hud-legal');
-  const legalText = doc.createTextNode('');
-  const sourceLink = el('a');
+  const legal = doc.createElement('p');
+  legal.className = 'hud-legal';
+  const legalText = doc.createElement('span');
+  const sep = doc.createTextNode(' · ');
+  const sourceLink = doc.createElement('a');
   sourceLink.href = SOURCE_URL;
-  sourceLink.target = '_blank';
+  // ⚠️ `noopener noreferrer`: a link that opens a new tab without these hands the opened page a
+  // handle on this one — tabnabbing. Pinned by `agpl-source-offer.node.test.ts`.
   sourceLink.rel = 'noopener noreferrer';
-  legal.append(legalText, ' ', sourceLink);
-
-  root.append(
-    movesTitle, movesValue, progress,
-    shuffle, hintButton,
-    sizeLabel, sizeSelect,
-    motionRow,
-    el('span', 'hud-spacer'),
-    legal,
-  );
-
-  function refresh(): void {
-    const run = deps.run();
-    const need = run.size * run.size - 1;
-    // Plain text, replaced. No animation on the rise — ADR-0049, and it is one line to violate.
-    movesValue.textContent = String(run.moves());
-    progress.textContent = i18n.t('hud.progress', { have: run.tilesHome(), need });
-  }
+  sourceLink.target = '_blank';
+  legal.append(legalText, sep, sourceLink);
+  root.appendChild(legal);
 
   function relabel(): void {
-    movesTitle.textContent = i18n.t('hud.moves');
-    shuffle.textContent = i18n.t('hud.shuffle');
-    hintButton.textContent = i18n.t('hud.hintShort');
-    hintButton.setAttribute('aria-label', i18n.t('hud.hint'));
-    sizeLabel.textContent = i18n.t('hud.size');
-    for (const option of Array.from(sizeSelect.options)) option.textContent = i18n.t(`size.${option.value}`);
-    motionText.textContent = i18n.t('hud.reducedMotion');
     legalText.textContent = i18n.t('legal.licence');
     sourceLink.textContent = i18n.t('legal.source');
-    refresh();
   }
-
   relabel();
 
   return {
     root,
-    refresh,
     relabel,
-    destroy() { root.remove(); },
+    destroy: () => root.remove(),
   };
 }
 
 /**
- * The CSS filter for a vision mode, or '' for none.
+ * The CSS filter for a vision mode, or `''` for none.
  *
- * ⚠️ APPLIED TO `#game-region`, ONCE, AND THAT IS THE WHOLE POINT. The engine's own path applies the
- * filter to the canvas and — for the nine EMPATHY modes — deliberately CLEARS it on the DOM layer,
- * because there the menus are the instrument for leaving the simulation and a blindness that
+ * ⚠️ APPLIED TO `#game-region`, ONCE, AND THAT IS THE WHOLE POINT. The engine's own path applies
+ * the filter to the canvas and — for the nine EMPATHY modes — deliberately CLEARS it on the DOM
+ * layer, because there the menus are the instrument for leaving the simulation and a blindness that
  * blanked the pause menu would lock a child inside it.
  *
  * That reasoning does not survive a game whose visible content IS DOM. Left alone, `blind`

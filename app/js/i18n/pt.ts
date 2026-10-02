@@ -53,8 +53,6 @@ const pt: Catalog = {
     'status.crashed': 'O jogo parou. Recarregue a página',
 
     // ---- the panel ------------------------------------------------------------------------
-    'hud.moves': 'Jogadas',
-    'hud.progress': '{have} de {need} no lugar',
     'hud.size': 'Tamanho do tabuleiro',
     'hud.shuffle': 'Embaralhar',
     'hud.hint': 'Mostrar as próximas jogadas',
@@ -89,6 +87,28 @@ const pt: Catalog = {
     'preset.right.label': 'Para a direita',
     'preset.action1.label': 'Deslizar',
     'preset.action1.hint': 'Desliza a peça sob o cursor para o espaço vazio.',
+
+
+    // ---- Engine HUD numbers (ADR-0168/0175) ----------------------------------
+    'hud.moves': 'Movimentos',
+    'hud.progress': 'Peças no lugar',
+
+    // ---- action3 (Dica) and action4 (Embaralhar), engine-driven ---------------
+    'preset.action3.label': 'Dica',
+    'preset.action3.hint': 'Ilumina as próximas peças a mover.',
+    'preset.action4.label': 'Embaralhar',
+    'preset.action4.hint': 'Começa uma partida nova em um tabuleiro embaralhado.',
+
+    // ---- gameOptions, engine-drawn rows (ADR-0182) ---------------------------
+    'game-options.size.label': 'Tamanho do tabuleiro',
+    'game-options.size.hint': 'Mais peças ensinam a resolver em passos maiores.',
+    'game-options.motion.label': 'Movimento reduzido',
+    'game-options.motion.hint': 'Desliga a animação do deslize. As peças teleportam.',
+
+    // ---- howToPlay slides (ADR-0195) -----------------------------------------
+    'howto.slide1': 'Deslize uma peça para o espaço vazio ao lado dela.',
+    'howto.slide2': 'Clique em uma peça distante na mesma linha ou coluna para empurrar várias de uma vez.',
+    'howto.slide3': 'Peça dica a qualquer altura. Ela mostra as próximas peças; não as joga por você.',
 
     // ---- AGPL section 13 ------------------------------------------------------------------
     // The obligation the licence creates, as something a player can act on. See docs/LICENSES.md.

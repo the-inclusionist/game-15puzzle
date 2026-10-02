@@ -88,7 +88,10 @@ describe('createI18n', () => {
   });
 
   it('interpolates the frame it is given', () => {
-    expect(i18n.t('hud.progress', { have: 3, need: 15 })).toBe('3 de 15 no lugar');
+    // ⚠️ The old `hud.progress` key was a TEMPLATE string the panel formatted locally; in step 11e
+    // the engine owns the HUD and the key is just the metric's NAME. A different key still exercises
+    // the frame — `a11y.boardLabel` carries `{size}`.
+    expect(i18n.t('a11y.boardLabel', { size: 4 })).toBe('Quebra-cabeça deslizante, 4 por 4');
   });
 
   it('reports pt-BR rather than bare pt, because the prosody differs', () => {
