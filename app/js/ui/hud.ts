@@ -48,18 +48,6 @@ export interface HudDeps {
   readonly i18n: I18n;
   run(): Run;
   onShuffle(): void;
-  /**
-   * OPEN THE EMPATHY PANEL.
-   *
-   * ⚠️ A BUTTON HERE AND NOT ONLY IN THE PAUSE CARD, AND IT IS A BRIDGE RATHER THAN A PREFERENCE. The
-   * engine's pause card carries an `empatia` item and this game wires it — but measured on 2026-09-11,
-   * seven keys pressed for real, NOTHING opens that card in this game: the engine's `_pause` is the
-   * gamepad START, and this game declares no preset that maps a key to it. A child at a keyboard would
-   * have no way in at all, and these modes are lesson content she is meant to reach.
-   *
-   * Delete this the day the card has an opener. The pause item stays wired either way.
-   */
-  onEmpathy(): void;
   onHint(): void;
   onSize(size: Size): void;
   onReducedMotion(on: boolean): void;
@@ -139,10 +127,6 @@ export function createHud(deps: HudDeps): Hud {
   motionBox.addEventListener('change', () => deps.onReducedMotion(motionBox.checked));
   motionRow.append(motionBox, motionText);
 
-  const empathy = el('button', 'hud-btn');
-  empathy.type = 'button';
-  empathy.id = 'hud-empathy';
-  empathy.addEventListener('click', () => deps.onEmpathy());
 
   const legal = el('p', 'hud-legal');
   const legalText = doc.createTextNode('');
@@ -156,7 +140,7 @@ export function createHud(deps: HudDeps): Hud {
     movesTitle, movesValue, progress,
     shuffle, hintButton,
     sizeLabel, sizeSelect,
-    empathy, motionRow,
+    motionRow,
     el('span', 'hud-spacer'),
     legal,
   );
@@ -176,8 +160,6 @@ export function createHud(deps: HudDeps): Hud {
     hintButton.setAttribute('aria-label', i18n.t('hud.hint'));
     sizeLabel.textContent = i18n.t('hud.size');
     for (const option of Array.from(sizeSelect.options)) option.textContent = i18n.t(`size.${option.value}`);
-    empathy.textContent = i18n.t('empathy.open');
-    empathy.setAttribute('aria-label', i18n.t('empathy.openLong'));
     motionText.textContent = i18n.t('hud.reducedMotion');
     legalText.textContent = i18n.t('legal.licence');
     sourceLink.textContent = i18n.t('legal.source');

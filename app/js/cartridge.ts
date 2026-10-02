@@ -30,13 +30,11 @@ import { createSurface } from './render/surface.ts';
 import { createTileGrid } from './ui/tile-grid.ts';
 import { createHud, visionFilter } from './ui/hud.ts';
 import { createTitleScreen } from './ui/title-screen.ts';
-import { createEmpathyPanel } from './ui/empathy-panel.ts';
 
 import { srAlert, srSay } from '@the-inclusionist/engine/core/a11y-sr.js';
 import { createStorage } from '@the-inclusionist/engine/platform/storage.js';
 import { gameKey } from '@the-inclusionist/engine/platform/storage-keys.js';
 import { readStoredScene } from '@the-inclusionist/engine/ui/motion-scene.js';
-import { VIZ_MODES } from '@the-inclusionist/engine/render/viz-modes.js';
 import { reachOfMode, readStoredVisual } from '@the-inclusionist/engine/render/viz-setters.js';
 import { DEFAULT_VISUAL } from '@the-inclusionist/engine/render/viz-axes.js';
 
@@ -455,11 +453,16 @@ export function createCartridge(): Cartridge {
        * presses it gets no error, no announcement and nothing at all, and a screen reader has just read
        * her an item that does not exist.
        */
+      /**
+       * ⚠️ `empatia` IS NOT WIRED HERE ANY MORE, AND THAT IS THE WHOLE OF 11d IN ONE DELETE.
+       *
+       * Engine 11 writes `engineActions.empatia = empathyPanel.open` into the pause card's dispatch
+       * table itself (`create-game.js:1600`), and the cartridge's `getPauseActs` is SPREAD ON TOP —
+       * so a cartridge that keeps its own `empatia: …` here overrides and LOSES the mounted panel.
+       * This game had its own panel while the engine shipped none; it does not any more.
+       */
       pauseActs = {
         resume: () => engine.pause.hide(0),
-        // The engine's own menu carries it too, so the day the card gains an opener this is already
-        // the route — and the HUD button beside it is the bridge until then, not a second design.
-        empatia: () => { engine.pause.hide(0); empathy.show(); },
       };
 
       /* ===================== THE TWO BOXES THIS GAME NEEDS, BOTH ITS OWN =====================
@@ -477,26 +480,18 @@ export function createCartridge(): Cartridge {
        */
       const world = doc.createElement('div');
       world.id = 'world';
-      /**
-       * THE LOW-VISION OVERLAY — the half of a simulation a CSS filter cannot carry.
-       *
-       * The engine splits a low-vision mode in two: a filter (blur, contrast) and an OVERLAY it asks
-       * the consumer for through `lvOverlayTex(lv)`. This game never supplied one, so `lv-tunnel` was
-       * a faint blur with no tunnel and `lv-macular` was nothing at all. As a grown-up's demonstration
-       * that was thin; as the lesson content the Dev says it is, it teaches something false.
-       *
-       * ⚠️ A SIBLING OF THE BOARD AND NOT A CANVAS PASS. The board is a 320x180 framebuffer with DOM
-       * digits over it, and the digits are the game's text — an overlay drawn into the canvas would
-       * leave them untouched and the simulation would be a lie in the other direction. A single
-       * element on top of both, painted by the stylesheet, covers exactly what a child sees.
-       */
-      const lvOverlay = doc.createElement('div');
-      lvOverlay.id = 'lv-overlay';
-      lvOverlay.setAttribute('aria-hidden', 'true');
       const side = doc.createElement('div');
       side.id = 'side';
       region.append(world, side);
-      world.appendChild(lvOverlay);
+      /**
+       * ⚠️ THE LOW-VISION OVERLAY IS THE ENGINE'S NOW, DELETED. Engine 11 mounts
+       * `ui/simulation-over-the-world`, which creates `canvas#viz-overlay` as a sibling of the
+       * declared world and paints `drawLowVision(c, lv, w, h)` into it from `render/low-vision-
+       * drawing`. Our `#lv-overlay` div, its `data-lv` attribute setter in `applyLook`, and the
+       * CSS gradients that drew tunnel/macular/diabetic shapes are gone with it. The engine draws
+       * better than our radial-gradient stack and keeps both halves of the simulation (filter + shape)
+       * from drifting apart (ADR-0187, ADR-0151 §2, issue #182).
+       */
 
       /**
        * ⚠️ THE ACCESSIBILITY BAR IS BORROWED, NOT OWNED — AND THIS IS THE SECOND OPEN QUESTION
@@ -577,25 +572,22 @@ export function createCartridge(): Cartridge {
         initial: { size, reducedMotion },
         onShuffle: () => newRun(size, Date.now() >>> 0, 'a11y.shuffled'),
         onHint: () => showHint(),
-        onEmpathy: () => (empathy.isOpen() ? empathy.hide() : empathy.show()),
         onSize: (next) => { store.set(key('size'), next); newRun(next, Date.now() >>> 0, 'a11y.sizeChanged'); },
         onReducedMotion: (on) => { reducedMotion = on; store.setBool(key('motion'), on); },
       });
       side.appendChild(hud.root);
 
       /**
-       * ⚠️ IN THE COLUMN AND NOT IN THE WORLD, WHICH IS WHAT MAKES LEAVING POSSIBLE. The empathy filter
-       * lands on `#world` and a CSS filter rasterises its whole subtree — so a panel inside it would go
-       * dark with everything else under `blind`, and the control for switching the simulation off would
-       * be the first thing the simulation hid. A child would be locked inside a lesson.
+       * ⚠️ THE EMPATHY PANEL IS THE ENGINE'S NOW, DELETED. Engine 11 mounts `ui/settings-empathy`
+       * through the pause card's `options → empatia` item (`create-game.js:1496-1600`), and the mode
+       * list, the refusal explanation and the WHOLE panel are built from `VIZ_MODES` by the engine
+       * itself. The child reaches it by SELECT (default `KeyF`), by the ☰ icon on the a11y bar, or
+       * by any transport pressing `select` via `systemPress`.
+       *
+       * This game's own `ui/empathy-panel.ts` is deleted in the same commit. The Dev's priority is
+       * the engine's menus, icons and themes — walking through the door the engine opened is what
+       * keeps the catalogue looking and behaving like one product.
        */
-      const empathy = createEmpathyPanel({
-        doc,
-        i18n,
-        visual: () => visual,
-        onPick: (simulacao) => { visual = { ...visual, simulacao }; applyLook(); },
-      });
-      side.appendChild(empathy.root);
 
       /* ===================== THE TWO SCREENS =====================
        *
@@ -656,10 +648,9 @@ export function createCartridge(): Cartridge {
          */
         const mode = visual.simulacao
           ?? (visual.correcao === 'tricro' ? 'normal' : `fix-${visual.correcao}`);
-        // The overlay carries the SHAPE of a low-vision mode; the filter carries its haze. Absent
-        // attribute = no overlay, which is every other mode including `blind`.
-        const lv = VIZ_MODES.find((m) => m.key === mode)?.lv;
-        if (lv) lvOverlay.dataset.lv = lv; else delete lvOverlay.dataset.lv;
+        // ⚠️ NO OVERLAY WRITE. The engine's own `simulation-over-the-world` paints the low-vision
+        // shape onto `canvas#viz-overlay` when the empathy panel fires; this call just moves the
+        // CSS filter on the world.
         engine.applyVisionFilter(visionFilter(mode), reachOfMode(mode));
       }
 
@@ -725,7 +716,7 @@ export function createCartridge(): Cartridge {
       // The language can change under a running game; anything JavaScript BUILT has to rebuild. The
       // engine re-applies only the static markup, and says so.
       const stopI18n = i18n.onChange(() => {
-        grid.rebuild(); hud.relabel(); titleScreen.refresh(); empathy.refresh();
+        grid.rebuild(); hud.relabel(); titleScreen.refresh();
       });
 
       applyLook();
@@ -777,7 +768,6 @@ export function createCartridge(): Cartridge {
           // skipped `exit()` would be the wrong fix, because `exit()` is where the cleanup lives.
           while (engine.scenes.top()) engine.scenes.pop();
           titleScreen.destroy();
-          empathy.destroy();
           grid.destroy();
           hud.destroy();
           surface.destroy();
