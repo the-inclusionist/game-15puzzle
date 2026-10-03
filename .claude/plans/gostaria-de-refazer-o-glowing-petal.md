@@ -1,6 +1,156 @@
-# game-15puzzle — engine 11.0.0
+# game-15puzzle — engine 11.0.0 + Cloudflare
 
 > Plano em pt-BR porque é a superfície da conversa. **Tudo dentro do repositório continua em inglês.**
+
+## 🔴 publicação no Cloudflare — plano (2026-10-02)
+
+### Contexto
+
+O ADR-0117 escolheu **uma origem** para todos os jogos — `o-inclusionista.jrocha.dev.br` — para que
+a cache `incl-pesados-v2` (particionada por origem) seja descarregada **uma vez por criança**, não
+uma vez por jogo. Entrega pelo Cloudflare: um Router Worker em `jrocha.dev.br` roteia
+`o-inclusionista.jrocha.dev.br/<slug>/*` para `<slug>.pages.dev` (Pages do jogo) e
+`o-inclusionista.jrocha.dev.br/heavy/*` para R2 via Functions. Padrão medido no `game-platformer`
+em 02/10/2026 e documentado por si na orientação deste turno.
+
+### O que NÃO é desta sessão
+
+Três coisas são da plataforma e do Dev, e eu não as faço nem no cartucho nem no shell:
+
+1. **Router Worker + tabela `GAMES`.** Precisa de uma linha nova:
+   `'game-15puzzle': 'game-15puzzle.pages.dev'`. Deploy e empurrão são do repositório do worker.
+2. **R2 bucket `the-inclusionist-lfs`** (jurisdição EU) com o espelho dos heavy. Hoje é cópia
+   manual de `~/Claude/inclusionist-heavy-mirror/heavy/`; a Press Start 2P deste jogo tem de estar
+   no espelho para `/heavy/<host><path>` resolver.
+3. **Seis pedidos à sessão da engine** (pausa/HUD por assento, painéis per-seat, cores por papel no
+   visual, «sair» por assento, gamepad no título, `inclusionist-heavy --base` com layout
+   `MIRROR_FOLDERS`). Fica registado aqui para ir à conversa certa; nenhum é tocado aqui.
+
+### 📏 Medido antes do planeamento — o que já está pronto
+
+Dei uma varredura ao repositório antes de desenhar o plano. Três coisas que o `game-platformer`
+precisou são verdade aqui **sem trabalho adicional**:
+
+- **Nenhum `fetch(…)` nem `BaseTexture.from(…)` com caminho relativo.** O jogo desenha procedural
+  (ADR-0027: zero glifos no framebuffer, todas as formas vêm de primitivas Pixi). As três mordidas
+  do platformer — mapa, demo do pad, atlas do personagem — não existem aqui.
+- **`uses` declarado** em `app/js/boot/standalone.ts:134`:
+  `uses: { neuralVoice: true, fonts: ['Press Start 2P'] }` (step 11f). `reading: true` **não é
+  preciso** — o jogo não tem texto em imagem para reconhecer.
+- **Chaves do preset nos três idiomas** em `app/js/i18n/{pt,en,es}.ts`: `preset.up.label`,
+  `preset.action1.label`, etc. (step 11b/11e). O `word()` da engine resolve-as sem recorrer à engine.
+  Não precisamos de `app/js/i18n/game-keys.ts` separado — a nossa organização já cobre.
+- **`app/public/` nem existe** — saiu com a fonte vendorizada em 11f. Vite não copia nada que não
+  deva ir.
+- **CI reutiliza o workflow da engine** (`.github/workflows/ci.yml` chama `the-inclusionist-engine/
+  .github/workflows/game-ci.yml@main`). O deploy do Pages corre pela integração GitHub do CF — não
+  precisamos de outro workflow a não ser que queiramos auditar o deploy.
+
+### Slug — a decisão primeira, por sua
+
+A pasta é `game-15-puzzle`, o package é `@the-inclusionist/game-15puzzle` (sem hífen interno).
+ADR-0082 §1 pede repo = package = uma palavra; há incoerência histórica. Para a tabela `GAMES` e
+para `INCL_BASE`, a convenção do platformer é o **nome do package**. Então o slug no plano é
+**`game-15puzzle`** (`INCL_BASE = "/game-15puzzle/"`, `name = "game-15puzzle"` no Pages/wrangler).
+Se preferir casar o repo (`game-15-puzzle`), três linhas mudam e o plano continua válido.
+
+### Passos — pequenos, em ordem
+
+**12a — Vite com `base` configurável.** `vite.config.ts` passa a aceitar `INCL_BASE` do ambiente,
+e o `defineGameBuild` continua a embrulhar. Shape:
+
+```ts
+const BASE = process.env.INCL_BASE || '/';
+const out  = 'dist' + BASE.replace(/\/$/, '');
+// ...
+config: defineConfig({
+  root: 'app',
+  base: BASE,
+  build: { outDir: `../${out}`, emptyOutDir: true, target: 'es2022' },
+  // resto como está
+})
+```
+
+⚠️ **O `build.outDir` muda com o `BASE`.** `vite build` no CF Pages corre com
+`INCL_BASE=/game-15puzzle/`, saída `dist/game-15puzzle/` — que é o que o `pages_build_output_dir =
+"dist"` do `wrangler.toml` serve, com o subpath embutido. Localmente, sem `INCL_BASE`, continua a
+sair `dist/` cru para o `vite preview` abrir na raiz. Modo `cartridge` do `defineGameBuild` ignora
+`base` e `outDir` (vai para `dist-lib/cartridge.js` como sempre) — não precisa de condicional.
+
+**12b — `<base href="/" />` no `app/index.html`.** Uma linha no `<head>`. Faz o `<base>` ser SEMPRE
+a raiz do domínio, para que `/heavy/<host><path>` resolva fora do subpath. É a receita que o
+platformer provou necessária, mesmo com a `base` do Vite — o Vite reescreve só os `src=` que ELE
+emite; HTML estático não.
+
+**12c — `wrangler.toml` na raiz.** Entrada mínima medida:
+
+```toml
+name = "game-15puzzle"
+compatibility_date = "2024-11-15"
+pages_build_output_dir = "dist/game-15puzzle"
+[vars]
+INCL_BASE = "/game-15puzzle/"
+[[r2_buckets]]
+binding = "LFS"
+bucket_name = "the-inclusionist-lfs"
+jurisdiction = "eu"
+```
+
+📌 **`jurisdiction = "eu"` é o erro «R2 bucket not found» mais comum.** Não omitir.
+
+📌 **Com `wrangler.toml` presente, o dashboard do CF Pages fica somente leitura para bindings.** O
+ficheiro é a verdade.
+
+**12d — `functions/heavy/[[path]].ts`.** Proxia `/heavy/<host><path>` para o R2. A tabela
+`MIRROR_FOLDERS` vem inlined — a sua orientação diz-no e dá a razão: *«esbuild do CF Pages não
+resolve o import do pacote de forma estável; é melhor copiar a tabela»*. Entra como ficheiro novo,
+derivado do do `game-platformer` com a `MIRROR_FOLDERS` da engine 11.
+
+**12e — `scripts/post-build-cloudflare.mjs`.** Escreve `dist/game-15puzzle/_headers` com os caminhos
+prefixados por `INCL_BASE`. `package.json` ganha o script `build:cf` = `vite build && node
+scripts/post-build-cloudflare.mjs`, e CF Pages chama-o em vez de `vite build`.
+
+**12f — CI/CD do deploy — DECIDIDO: pela integração GitHub do CF Pages.** `git push` para `main`
+dispara. Sem workflow nosso de deploy (o `.github/workflows/deploy-router-worker.yml` da sua
+orientação é só para quem move o Router Worker — não é este repo).
+
+**12g — Preparar o pedido ao Dev para a linha no Router Worker.** Depois do primeiro deploy
+funcionar, abrir issue/mensagem para incluir `'game-15puzzle': 'game-15puzzle.pages.dev'` em `GAMES`
+e para colocar a Press Start 2P no espelho R2 (se ainda não lá estiver pela engine).
+
+### Verificação
+
+- `INCL_BASE=/game-15puzzle/ npm run build` → sai em `dist/game-15puzzle/`, com os assets a
+  conterem `/game-15puzzle/assets/…`.
+- `npx wrangler pages dev dist/game-15puzzle` serve local em `localhost:8788/game-15puzzle/`,
+  `/heavy/<host><path>` responde (R2 em DEV precisa de bind local ou mock).
+- Primeiro `git push main` → projecto `game-15puzzle.pages.dev` criado automaticamente, deploy
+  verde.
+- Depois da linha no Router Worker: `o-inclusionista.jrocha.dev.br/game-15puzzle/` abre a tela de
+  título, 🚥/🌗 montam da barra, Enter num tile ativa (step 11c), `engine.problems` vazio.
+- Rede: um pedido a `o-inclusionista.jrocha.dev.br/heavy/…` quando a Kokoro é lazy-carregada à
+  primeira fala. Nenhum pedido a `huggingface.co` ou `cdn.jsdelivr.net` da parte da engine (step
+  11f desligou a VLibras; a engine serve o resto do seu lado).
+
+### Ficheiros tocados
+
+**Criados**: `wrangler.toml`, `functions/heavy/[[path]].ts`, `scripts/post-build-cloudflare.mjs`.
+**Editados**: `vite.config.ts` (base + outDir), `app/index.html` (`<base>`), `package.json`
+(scripts), `README.md` (parágrafo sobre a URL de produção).
+
+### O que NÃO entra, dito explícito
+
+- **Multi-tenant com `players > 1`** — o jogo é um só assento (step 11b). Os seis pedidos à engine
+  (pausa/HUD por assento) não se aplicam.
+- **`inclusionist-heavy --base`** — não geramos espelho; a Press Start 2P vem do que a engine
+  publicar no R2.
+- **Workflow de deploy próprio** — a integração GitHub do CF basta.
+- **Testes contra `*.pages.dev` em CI** — não há runner `axe` contra a URL de produção neste plano;
+  o `scripts/axe-check.mjs` continua a correr contra o `dist/` local.
+
+---
+
+
 
 ## 🔴 engine 11.0.0 — plano (2026-10-02)
 
