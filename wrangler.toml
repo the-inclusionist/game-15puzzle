@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Cloudflare Pages configuration (ADR-0117, Cloudflare orientation of 02/10/2026).
+#
+# ============================= WHAT THIS FILE DECIDES =============================
+# Where Pages reads the built site from, which subpath this game lives on, and which R2 bucket
+# the `/heavy/*` Function proxies to. Nothing else; the Router Worker that fans
+# `o-inclusionista.jrocha.dev.br/*` out to the per-game `*.pages.dev` origins lives in another
+# repository and is the Dev's work.
+#
+# 📌 WITH THIS FILE PRESENT, the dashboard's bindings UI goes read-only — the file is the truth
+# (CF Pages behaviour by design). Changes land here, not there.
+#
+# ⚠️ `pages_build_output_dir` IS THE SUBDIRECTORY, NOT `dist`. `vite build` with
+# `INCL_BASE=/game-15puzzle/` writes to `dist/game-15puzzle/` (see `vite.config.ts`); Pages serves
+# that directory as the origin's root, so the assets inside — all absolute `/game-15puzzle/assets/…`
+# — line up with the subpath the Router Worker routes.
+#
+# ⚠️ `jurisdiction = "eu"` IS THE «R2 BUCKET NOT FOUND» FIX. Jurisdictional buckets live under
+# `.eu.r2.cloudflarestorage.com`, and omitting this is the most common error on the first deploy.
+
+name = "game-15puzzle"
+compatibility_date = "2024-11-15"
+pages_build_output_dir = "dist/game-15puzzle"
+
+[vars]
+# ⚠️ READ BY `vite.config.ts` AT BUILD TIME and threaded through to every absolute path Vite emits.
+# A build without this variable set goes to `dist/` cru for `vite preview` to open at the root.
+INCL_BASE = "/game-15puzzle/"
+
+# The R2 bucket Functions reach through `env.LFS`. One bucket for the whole catalogue — the heavy
+# files are addressed by their upstream URL (`heavy/<host><path>`), so two games pulling the same
+# upstream file hit the same key and the cache stays flat.
+[[r2_buckets]]
+binding = "LFS"
+bucket_name = "the-inclusionist-lfs"
+jurisdiction = "eu"

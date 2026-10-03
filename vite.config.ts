@@ -32,6 +32,23 @@ import { playwright } from '@vitest/browser-playwright';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineGameBuild } from '@the-inclusionist/engine/build';
 
+/**
+ * THE SUBPATH THE ROUTER WORKER SERVES THIS GAME FROM (ADR-0117, Cloudflare orientation).
+ *
+ * `o-inclusionista.jrocha.dev.br/game-15puzzle/*` — one origin per catalogue so the 1,2 GiB of
+ * `heavy/` cache (`incl-pesados-v2`) is downloaded ONCE per child, not once per game. On the CF
+ * Pages build the environment carries `INCL_BASE = "/game-15puzzle/"`; locally, without it, the
+ * build goes to `dist/` cru for `vite preview` to open at the root.
+ *
+ * ⚠️ `build.outDir` MOVES WITH THE BASE. The subpath has to be baked into the folder structure of
+ * `dist/` because `wrangler.toml` points `pages_build_output_dir` at the subdirectory, and the
+ * assets inside carry the base-prefixed paths that match. A single `dist/` with subpath-prefixed
+ * references and a Pages root at `dist/` would ship the HTML at the wrong origin path.
+ */
+const INCL_BASE = process.env.INCL_BASE || '/';
+const OUT_SUBDIR = INCL_BASE.replace(/^\/+|\/+$/g, '');          // 'game-15puzzle' or ''
+const OUT_DIR = OUT_SUBDIR ? `../dist/${OUT_SUBDIR}` : '../dist';
+
 const PWA = VitePWA({
   registerType: 'autoUpdate',
   workbox: {
@@ -57,6 +74,8 @@ export default defineGameBuild({
   cartridge: 'app/js/cartridge.ts',
   config: defineConfig({
     root: 'app',
+    base: INCL_BASE,
+    build: { outDir: OUT_DIR, emptyOutDir: true, target: 'es2022' },
     plugins: [PWA],
     optimizeDeps: {
       // The engine is a large ESM package Vite would otherwise pre-bundle into one blob, making a
