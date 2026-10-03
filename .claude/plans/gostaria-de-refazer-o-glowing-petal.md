@@ -1,4 +1,4 @@
-# game-15puzzle — engine 11.0.0 + Cloudflare
+# game-15-puzzle — engine 11.0.0 + Cloudflare
 
 > Plano em pt-BR porque é a superfície da conversa. **Tudo dentro do repositório continua em inglês.**
 
@@ -18,7 +18,7 @@ em 02/10/2026 e documentado por si na orientação deste turno.
 Três coisas são da plataforma e do Dev, e eu não as faço nem no cartucho nem no shell:
 
 1. **Router Worker + tabela `GAMES`.** Precisa de uma linha nova:
-   `'game-15puzzle': 'game-15puzzle.pages.dev'`. Deploy e empurrão são do repositório do worker.
+   `'game-15-puzzle': 'game-15-puzzle.pages.dev'`. Deploy e empurrão são do repositório do worker.
 2. **R2 bucket `the-inclusionist-lfs`** (jurisdição EU) com o espelho dos heavy. Hoje é cópia
    manual de `~/Claude/inclusionist-heavy-mirror/heavy/`; a Press Start 2P deste jogo tem de estar
    no espelho para `/heavy/<host><path>` resolver.
@@ -48,10 +48,10 @@ precisou são verdade aqui **sem trabalho adicional**:
 
 ### Slug — a decisão primeira, por sua
 
-A pasta é `game-15-puzzle`, o package é `@the-inclusionist/game-15puzzle` (sem hífen interno).
+A pasta é `game-15-puzzle`, o package é `@the-inclusionist/game-15-puzzle` (sem hífen interno).
 ADR-0082 §1 pede repo = package = uma palavra; há incoerência histórica. Para a tabela `GAMES` e
 para `INCL_BASE`, a convenção do platformer é o **nome do package**. Então o slug no plano é
-**`game-15puzzle`** (`INCL_BASE = "/game-15puzzle/"`, `name = "game-15puzzle"` no Pages/wrangler).
+**`game-15-puzzle`** (`INCL_BASE = "/game-15-puzzle/"`, `name = "game-15-puzzle"` no Pages/wrangler).
 Se preferir casar o repo (`game-15-puzzle`), três linhas mudam e o plano continua válido.
 
 ### Passos — pequenos, em ordem
@@ -72,7 +72,7 @@ config: defineConfig({
 ```
 
 ⚠️ **O `build.outDir` muda com o `BASE`.** `vite build` no CF Pages corre com
-`INCL_BASE=/game-15puzzle/`, saída `dist/game-15puzzle/` — que é o que o `pages_build_output_dir =
+`INCL_BASE=/game-15-puzzle/`, saída `dist/game-15-puzzle/` — que é o que o `pages_build_output_dir =
 "dist"` do `wrangler.toml` serve, com o subpath embutido. Localmente, sem `INCL_BASE`, continua a
 sair `dist/` cru para o `vite preview` abrir na raiz. Modo `cartridge` do `defineGameBuild` ignora
 `base` e `outDir` (vai para `dist-lib/cartridge.js` como sempre) — não precisa de condicional.
@@ -85,11 +85,11 @@ emite; HTML estático não.
 **12c — `wrangler.toml` na raiz.** Entrada mínima medida:
 
 ```toml
-name = "game-15puzzle"
+name = "game-15-puzzle"
 compatibility_date = "2024-11-15"
-pages_build_output_dir = "dist/game-15puzzle"
+pages_build_output_dir = "dist/game-15-puzzle"
 [vars]
-INCL_BASE = "/game-15puzzle/"
+INCL_BASE = "/game-15-puzzle/"
 [[r2_buckets]]
 binding = "LFS"
 bucket_name = "the-inclusionist-lfs"
@@ -106,7 +106,7 @@ ficheiro é a verdade.
 resolve o import do pacote de forma estável; é melhor copiar a tabela»*. Entra como ficheiro novo,
 derivado do do `game-platformer` com a `MIRROR_FOLDERS` da engine 11.
 
-**12e — `scripts/post-build-cloudflare.mjs`.** Escreve `dist/game-15puzzle/_headers` com os caminhos
+**12e — `scripts/post-build-cloudflare.mjs`.** Escreve `dist/game-15-puzzle/_headers` com os caminhos
 prefixados por `INCL_BASE`. `package.json` ganha o script `build:cf` = `vite build && node
 scripts/post-build-cloudflare.mjs`, e CF Pages chama-o em vez de `vite build`.
 
@@ -115,18 +115,18 @@ dispara. Sem workflow nosso de deploy (o `.github/workflows/deploy-router-worker
 orientação é só para quem move o Router Worker — não é este repo).
 
 **12g — Preparar o pedido ao Dev para a linha no Router Worker.** Depois do primeiro deploy
-funcionar, abrir issue/mensagem para incluir `'game-15puzzle': 'game-15puzzle.pages.dev'` em `GAMES`
+funcionar, abrir issue/mensagem para incluir `'game-15-puzzle': 'game-15-puzzle.pages.dev'` em `GAMES`
 e para colocar a Press Start 2P no espelho R2 (se ainda não lá estiver pela engine).
 
 ### Verificação
 
-- `INCL_BASE=/game-15puzzle/ npm run build` → sai em `dist/game-15puzzle/`, com os assets a
-  conterem `/game-15puzzle/assets/…`.
-- `npx wrangler pages dev dist/game-15puzzle` serve local em `localhost:8788/game-15puzzle/`,
+- `INCL_BASE=/game-15-puzzle/ npm run build` → sai em `dist/game-15-puzzle/`, com os assets a
+  conterem `/game-15-puzzle/assets/…`.
+- `npx wrangler pages dev dist/game-15-puzzle` serve local em `localhost:8788/game-15-puzzle/`,
   `/heavy/<host><path>` responde (R2 em DEV precisa de bind local ou mock).
-- Primeiro `git push main` → projecto `game-15puzzle.pages.dev` criado automaticamente, deploy
+- Primeiro `git push main` → projecto `game-15-puzzle.pages.dev` criado automaticamente, deploy
   verde.
-- Depois da linha no Router Worker: `o-inclusionista.jrocha.dev.br/game-15puzzle/` abre a tela de
+- Depois da linha no Router Worker: `o-inclusionista.jrocha.dev.br/game-15-puzzle/` abre a tela de
   título, 🚥/🌗 montam da barra, Enter num tile ativa (step 11c), `engine.problems` vazio.
 - Rede: um pedido a `o-inclusionista.jrocha.dev.br/heavy/…` quando a Kokoro é lazy-carregada à
   primeira fala. Nenhum pedido a `huggingface.co` ou `cdn.jsdelivr.net` da parte da engine (step

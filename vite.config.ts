@@ -35,9 +35,9 @@ import { defineGameBuild } from '@the-inclusionist/engine/build';
 /**
  * THE SUBPATH THE ROUTER WORKER SERVES THIS GAME FROM (ADR-0117, Cloudflare orientation).
  *
- * `o-inclusionista.jrocha.dev.br/game-15puzzle/*` — one origin per catalogue so the 1,2 GiB of
+ * `o-inclusionista.jrocha.dev.br/game-15-puzzle/*` — one origin per catalogue so the 1,2 GiB of
  * `heavy/` cache (`incl-pesados-v2`) is downloaded ONCE per child, not once per game. On the CF
- * Pages build the environment carries `INCL_BASE = "/game-15puzzle/"`; locally, without it, the
+ * Pages build the environment carries `INCL_BASE = "/game-15-puzzle/"`; locally, without it, the
  * build goes to `dist/` cru for `vite preview` to open at the root.
  *
  * ⚠️ `build.outDir` MOVES WITH THE BASE. The subpath has to be baked into the folder structure of
@@ -46,7 +46,7 @@ import { defineGameBuild } from '@the-inclusionist/engine/build';
  * references and a Pages root at `dist/` would ship the HTML at the wrong origin path.
  */
 const INCL_BASE = process.env.INCL_BASE || '/';
-const OUT_SUBDIR = INCL_BASE.replace(/^\/+|\/+$/g, '');          // 'game-15puzzle' or ''
+const OUT_SUBDIR = INCL_BASE.replace(/^\/+|\/+$/g, '');          // 'game-15-puzzle' or ''
 const OUT_DIR = OUT_SUBDIR ? `../dist/${OUT_SUBDIR}` : '../dist';
 
 const PWA = VitePWA({

@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- ⚠️ `<base href="/" />` AND ITS WHOLE PURPOSE IS THE SUBPATH DEPLOY (ADR-0117, Cloudflare).
-     The page lives at `o-inclusionista.jrocha.dev.br/game-15puzzle/`, and whatever the engine
+     The page lives at `o-inclusionista.jrocha.dev.br/game-15-puzzle/`, and whatever the engine
      fetches as `heavy/<host><path>` with no leading slash would otherwise resolve to
-     `/game-15puzzle/heavy/…` — inside the game's subpath, where the Router Worker's `/heavy/*`
+     `/game-15-puzzle/heavy/…` — inside the game's subpath, where the Router Worker's `/heavy/*`
      function cannot see it. Base at `/` sends every relative URL back to the domain root.
 
      ⚠️ AND THIS IS SAFE HERE FOR A REASON MEASURED, NOT ASSUMED: this game has NO runtime `fetch`

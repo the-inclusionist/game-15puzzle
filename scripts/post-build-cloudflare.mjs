@@ -3,7 +3,7 @@
 //
 // Pos-build que escreve `dist/_headers` com os caminhos no `base` certo. Corre so no build de producao
 // (apos `vite build`); nao faz nada em dev. O `app/public/_headers` original ficou obsoleto quando o jogo
-// passou a viver em `dist/game-15puzzle/*` em producao: um `_headers` dentro de `dist/game-15puzzle/`
+// passou a viver em `dist/game-15-puzzle/*` em producao: um `_headers` dentro de `dist/game-15-puzzle/`
 // NAO E' LIDO pelo CF Pages, que so olha para a raiz de `pages_build_output_dir` (`dist/`).
 
 import { writeFileSync, existsSync, rmSync, mkdirSync } from 'node:fs';
@@ -14,8 +14,8 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..');
 const DIST = join(REPO, 'dist');
 const base = (process.env.INCL_BASE || '/').replace(/\/+$/, '/').replace(/\/+$/, '');
-// base e' sempre do tipo `/game-15puzzle` (sem barra final) ou vazio para raiz.
-const prefix = base; // ex.: `/game-15puzzle`
+// base e' sempre do tipo `/game-15-puzzle` (sem barra final) ou vazio para raiz.
+const prefix = base; // ex.: `/game-15-puzzle`
 
 if (!existsSync(DIST)) {
   console.error(`post-build: ${DIST} nao existe. Correste \`vite build\`?`);
